@@ -1,0 +1,186 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish'
+        required: true
+        type: choice
+        options:
+          - all
+          - python
+          - node
+          - java
+      dry_run:
+        description: 'Dry run (do not actually publish)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Publish Python package to PyPI
+  publish-python:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.package == 'all' || github.event.inputs.package == 'python'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        working-directory: packages/python
+        run: python -m build
+
+      - name: Publish to PyPI
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        working-directory: packages/python
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload dist/*
+
+      - name: Dry run - Show what would be published
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        working-directory: packages/python
+        run: |
+          echo "Would publish the following files:"
+          ls -la dist/
+
+  # Publish Node.js package to npm
+  publish-node:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.package == 'all' || github.event.inputs.package == 'node'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        working-directory: packages/node
+        run: npm ci
+
+      - name: Build
+        working-directory: packages/node
+        run: npm run build
+
+      - name: Publish to npm
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        working-directory: packages/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Dry run - Show what would be published
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        working-directory: packages/node
+        run: npm pack --dry-run
+
+  # Publish Java package to Maven Central
+  publish-java:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.package == 'all' || github.event.inputs.package == 'java'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
+
+      - name: Build package
+        working-directory: packages/java
+        run: mvn clean package -DskipTests
+
+      - name: Publish to Maven Central
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        working-directory: packages/java
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn deploy -DskipTests
+
+      - name: Dry run - Show what would be published
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        working-directory: packages/java
+        run: |
+          echo "Would publish the following files:"
+          ls -la target/*.jar
+
+  # Publish to GitHub Packages (all languages)
+  publish-github-packages:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python to GitHub Packages
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Python package
+        working-directory: packages/python
+        run: |
+          pip install build twine
+          python -m build
+
+      # Node.js to GitHub Packages
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Build Node.js package
+        working-directory: packages/node
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish Node.js to GitHub Packages
+        working-directory: packages/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --access public
+
+      # Java to GitHub Packages
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Publish Java to GitHub Packages
+        working-directory: packages/java
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn deploy -DskipTests -Dregistry=https://maven.pkg.github.com/D2R-Daniel
