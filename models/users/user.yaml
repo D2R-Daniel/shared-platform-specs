@@ -140,19 +140,24 @@ definitions:
       tenant_id:
         type: string
         format: uuid
-        description: Tenant/organization ID
+        description: Tenant/organization ID (required for multi-tenant apps)
         example: "123e4567-e89b-12d3-a456-426614174000"
+
+      department_id:
+        type: string
+        format: uuid
+        description: Department ID within the organization
 
       team_id:
         type: string
         format: uuid
-        description: Team/department ID
+        description: Team ID (sub-unit within department, optional)
 
       manager_id:
         $ref: '#/definitions/UserId'
         description: Direct manager's user ID
 
-      # External Identity
+      # External Identity / SSO
       external_id:
         type: string
         maxLength: 255
@@ -166,7 +171,27 @@ definitions:
           - microsoft
           - okta
           - saml
-        description: Authentication provider
+          - oidc
+        description: Authentication provider used for this user
+
+      # Microsoft Entra ID / Azure AD (specific fields for Azure SSO)
+      entra_object_id:
+        type: string
+        maxLength: 255
+        description: Microsoft Entra ID (Azure AD) Object ID
+        example: "72f988bf-86f1-41af-91ab-2d7cd011db47"
+
+      entra_upn:
+        type: string
+        maxLength: 255
+        description: Microsoft Entra ID User Principal Name
+        example: "john.doe@contoso.onmicrosoft.com"
+
+      # SSO Sync Tracking
+      sso_last_sync_at:
+        type: string
+        format: date-time
+        description: When user profile was last synced from IdP
 
       # Metadata
       metadata:
@@ -270,13 +295,25 @@ indexes:
     columns: [external_id, identity_provider]
     description: Fast lookup by external ID
 
+  - name: users_entra_object_id
+    columns: [entra_object_id]
+    description: Fast lookup by Azure AD Object ID
+
   - name: users_status
     columns: [status, tenant_id]
     description: Filter by status
 
+  - name: users_department
+    columns: [department_id]
+    description: Filter by department
+
   - name: users_team
     columns: [team_id]
     description: Filter by team
+
+  - name: users_manager
+    columns: [manager_id]
+    description: Find direct reports
 
   - name: users_created_at
     columns: [created_at]

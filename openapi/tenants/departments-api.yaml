@@ -1,0 +1,624 @@
+openapi: 3.0.3
+info:
+  title: Department Management API
+  description: |
+    API for managing departments within a tenant.
+    Supports hierarchical department structures with parent-child relationships.
+  version: 1.0.0
+  contact:
+    name: Platform Team
+    email: platform@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: https://api.staging.example.com/v1
+    description: Staging server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Departments
+    description: Department management
+
+paths:
+  /departments:
+    get:
+      tags: [Departments]
+      summary: List departments
+      description: |
+        List departments for the current tenant.
+        Supports filtering by parent, status, and search.
+      operationId: listDepartments
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by parent department (use 'root' for top-level)
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in name or code
+        - name: include_children
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include nested children in response
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Departments]
+      summary: Create department
+      description: Create a new department
+      operationId: createDepartment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDepartmentRequest'
+      responses:
+        '201':
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict - code already exists in tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /departments/tree:
+    get:
+      tags: [Departments]
+      summary: Get department tree
+      description: Get the full department hierarchy as a tree structure
+      operationId: getDepartmentTree
+      parameters:
+        - name: root_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Start from specific department (default is full tree)
+        - name: max_depth
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 10
+          description: Maximum depth to return
+        - name: include_members
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include member count for each department
+      responses:
+        '200':
+          description: Department tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DepartmentTree'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /departments/{departmentId}:
+    parameters:
+      - $ref: '#/components/parameters/DepartmentIdParam'
+
+    get:
+      tags: [Departments]
+      summary: Get department
+      description: Get department details by ID
+      operationId: getDepartment
+      parameters:
+        - name: include_head
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include department head user details
+        - name: include_parent
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include parent department details
+      responses:
+        '200':
+          description: Department details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentWithDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Departments]
+      summary: Update department
+      description: Update department details
+      operationId: updateDepartment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentRequest'
+      responses:
+        '200':
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Departments]
+      summary: Delete department
+      description: |
+        Soft-delete a department.
+        Fails if department has active members or child departments.
+      operationId: deleteDepartment
+      parameters:
+        - name: force
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Force delete even with members (moves them to parent)
+      responses:
+        '204':
+          description: Department deleted
+        '400':
+          description: Cannot delete - has members or children
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{departmentId}/members:
+    parameters:
+      - $ref: '#/components/parameters/DepartmentIdParam'
+
+    get:
+      tags: [Departments]
+      summary: List department members
+      description: Get users who belong to this department
+      operationId: listDepartmentMembers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: include_subdepartments
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include members from child departments
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, all]
+            default: active
+          description: Filter by user status
+      responses:
+        '200':
+          description: List of department members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentMembersResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{departmentId}/move:
+    parameters:
+      - $ref: '#/components/parameters/DepartmentIdParam'
+
+    post:
+      tags: [Departments]
+      summary: Move department
+      description: Move department to a new parent (changes hierarchy)
+      operationId: moveDepartment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                new_parent_id:
+                  type: string
+                  format: uuid
+                  description: New parent department ID (null for root)
+                  nullable: true
+      responses:
+        '200':
+          description: Department moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          description: Invalid move (circular reference or other error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    DepartmentIdParam:
+      name: departmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Department ID
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page
+
+    SortParam:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: name:asc
+      description: Sort field and direction (e.g., name:asc, created_at:desc)
+
+  schemas:
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        path:
+          type: string
+          description: Materialized path for hierarchy
+        level:
+          type: integer
+          description: Depth in hierarchy (0 = root)
+        head_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        is_active:
+          type: boolean
+        sort_order:
+          type: integer
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        cost_center:
+          type: string
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DepartmentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        level:
+          type: integer
+        is_active:
+          type: boolean
+        member_count:
+          type: integer
+
+    DepartmentTree:
+      allOf:
+        - $ref: '#/components/schemas/Department'
+        - type: object
+          properties:
+            children:
+              type: array
+              items:
+                $ref: '#/components/schemas/DepartmentTree'
+            member_count:
+              type: integer
+            total_member_count:
+              type: integer
+              description: Including all sub-departments
+
+    DepartmentWithDetails:
+      allOf:
+        - $ref: '#/components/schemas/Department'
+        - type: object
+          properties:
+            head:
+              $ref: '#/components/schemas/UserSummary'
+            parent:
+              $ref: '#/components/schemas/DepartmentSummary'
+            children_count:
+              type: integer
+            member_count:
+              type: integer
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        picture:
+          type: string
+          format: uri
+
+    DepartmentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    DepartmentMembersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateDepartmentRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        code:
+          type: string
+          pattern: '^[A-Z0-9_-]+$'
+          maxLength: 50
+          description: Auto-generated from name if not provided
+        description:
+          type: string
+          maxLength: 1000
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent department (null for root)
+        head_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        sort_order:
+          type: integer
+          default: 0
+        location_id:
+          type: string
+          format: uuid
+        cost_center:
+          type: string
+          maxLength: 50
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateDepartmentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        head_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        is_active:
+          type: boolean
+        sort_order:
+          type: integer
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        cost_center:
+          type: string
+          maxLength: 50
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

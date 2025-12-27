@@ -1,0 +1,308 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/models/tenants/sso-config.yaml"
+title: SSOConfig
+description: |
+  Single Sign-On (SSO) configuration for a tenant.
+  Supports multiple identity providers including Microsoft Entra ID (Azure AD),
+  Okta, Google Workspace, and generic SAML 2.0 providers.
+  Based on implementations from Dream Team and Dream Learn.
+
+type: object
+
+required:
+  - id
+  - tenant_id
+  - provider
+
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique identifier for the SSO configuration
+    example: "550e8400-e29b-41d4-a716-446655440001"
+
+  tenant_id:
+    type: string
+    format: uuid
+    description: Reference to the tenant this configuration belongs to
+    example: "550e8400-e29b-41d4-a716-446655440000"
+
+  provider:
+    type: string
+    enum:
+      - azure_ad
+      - okta
+      - google
+      - saml
+      - oidc
+    description: |
+      SSO provider type:
+      - azure_ad: Microsoft Entra ID (formerly Azure AD)
+      - okta: Okta Identity Platform
+      - google: Google Workspace
+      - saml: Generic SAML 2.0 provider
+      - oidc: Generic OpenID Connect provider
+
+  enabled:
+    type: boolean
+    default: false
+    description: Whether SSO is currently enabled for this tenant
+
+  # Provider Display Name
+  display_name:
+    type: string
+    maxLength: 100
+    description: Display name shown to users (e.g., "Sign in with Company SSO")
+    example: "Sign in with Acme Corp"
+
+  # Microsoft Entra ID / Azure AD Configuration
+  azure_ad:
+    type: object
+    description: Configuration for Microsoft Entra ID (Azure AD)
+    properties:
+      tenant_id:
+        type: string
+        description: Azure AD Tenant ID (Directory ID)
+        example: "72f988bf-86f1-41af-91ab-2d7cd011db47"
+      client_id:
+        type: string
+        description: Application (client) ID from Azure AD app registration
+        example: "6731de76-14a6-49ae-97bc-6eba6914391e"
+      client_secret_encrypted:
+        type: string
+        description: Encrypted client secret (store encrypted, never in plain text)
+      discovery_url:
+        type: string
+        format: uri
+        description: OpenID Connect discovery URL (auto-generated if not provided)
+        example: "https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
+
+  # Okta Configuration
+  okta:
+    type: object
+    description: Configuration for Okta
+    properties:
+      domain:
+        type: string
+        description: Okta domain (e.g., dev-123456.okta.com)
+        example: "dev-123456.okta.com"
+      client_id:
+        type: string
+        description: Okta application client ID
+      client_secret_encrypted:
+        type: string
+        description: Encrypted client secret
+      authorization_server:
+        type: string
+        description: Custom authorization server (optional)
+        example: "default"
+
+  # Google Workspace Configuration
+  google:
+    type: object
+    description: Configuration for Google Workspace
+    properties:
+      client_id:
+        type: string
+        description: Google OAuth client ID
+      client_secret_encrypted:
+        type: string
+        description: Encrypted client secret
+      hosted_domain:
+        type: string
+        description: Restrict to specific Google Workspace domain
+        example: "acme.com"
+
+  # Generic SAML 2.0 Configuration
+  saml:
+    type: object
+    description: Configuration for generic SAML 2.0 providers
+    properties:
+      metadata_url:
+        type: string
+        format: uri
+        description: URL to IdP metadata XML
+        example: "https://idp.example.com/metadata.xml"
+      entity_id:
+        type: string
+        description: Service Provider Entity ID
+        example: "urn:platform:sp"
+      sso_url:
+        type: string
+        format: uri
+        description: IdP Single Sign-On URL
+      slo_url:
+        type: string
+        format: uri
+        description: IdP Single Logout URL (optional)
+      certificate:
+        type: string
+        description: IdP X.509 certificate (PEM format)
+      private_key_encrypted:
+        type: string
+        description: SP private key for signing (encrypted)
+      signature_algorithm:
+        type: string
+        enum:
+          - "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+          - "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+        default: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+      name_id_format:
+        type: string
+        default: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+
+  # Generic OIDC Configuration
+  oidc:
+    type: object
+    description: Configuration for generic OpenID Connect providers
+    properties:
+      issuer:
+        type: string
+        format: uri
+        description: OIDC issuer URL
+      client_id:
+        type: string
+      client_secret_encrypted:
+        type: string
+      authorization_endpoint:
+        type: string
+        format: uri
+      token_endpoint:
+        type: string
+        format: uri
+      userinfo_endpoint:
+        type: string
+        format: uri
+      jwks_uri:
+        type: string
+        format: uri
+      scopes:
+        type: array
+        items:
+          type: string
+        default: ["openid", "profile", "email"]
+
+  # SCIM Configuration
+  scim:
+    type: object
+    description: SCIM 2.0 provisioning configuration
+    properties:
+      enabled:
+        type: boolean
+        default: false
+        description: Whether SCIM provisioning is enabled
+      bearer_token:
+        type: string
+        description: Bearer token for SCIM endpoint authentication
+      base_url:
+        type: string
+        format: uri
+        description: Base URL for SCIM endpoints
+        example: "https://api.platform.com/scim/v2"
+      sync_groups:
+        type: boolean
+        default: true
+        description: Whether to sync groups from IdP
+
+  # Just-In-Time (JIT) Provisioning
+  jit_provisioning:
+    type: object
+    description: Configuration for automatic user creation on first SSO login
+    properties:
+      enabled:
+        type: boolean
+        default: true
+        description: Whether to auto-create users on first login
+      default_role_id:
+        type: string
+        format: uuid
+        description: Role to assign to newly provisioned users
+      default_department_id:
+        type: string
+        format: uuid
+        description: Department to assign to newly provisioned users
+      require_email_domain:
+        type: boolean
+        default: false
+        description: Whether to require email domain to match tenant domain
+
+  # Attribute Mappings
+  attribute_mappings:
+    type: object
+    description: Map IdP attributes to platform user fields
+    properties:
+      user_id:
+        type: string
+        description: IdP attribute for unique user ID
+        default: "sub"
+        example: "oid"
+      email:
+        type: string
+        default: "email"
+      first_name:
+        type: string
+        default: "given_name"
+      last_name:
+        type: string
+        default: "family_name"
+      display_name:
+        type: string
+        default: "name"
+      groups:
+        type: string
+        description: IdP attribute containing group memberships
+        example: "groups"
+      department:
+        type: string
+        example: "department"
+      job_title:
+        type: string
+        example: "jobTitle"
+      phone:
+        type: string
+        example: "phone_number"
+      avatar_url:
+        type: string
+        example: "picture"
+    additionalProperties:
+      type: string
+      description: Additional custom attribute mappings
+
+  # Sync Settings
+  last_sync_at:
+    type: string
+    format: date-time
+    description: When the last directory sync occurred
+
+  sync_frequency:
+    type: string
+    enum:
+      - manual
+      - hourly
+      - daily
+      - weekly
+    default: daily
+    description: How often to sync users from IdP
+
+  # Timestamps
+  created_at:
+    type: string
+    format: date-time
+    description: When the SSO configuration was created
+
+  updated_at:
+    type: string
+    format: date-time
+    description: When the SSO configuration was last updated
+
+# Database indexes
+indexes:
+  - name: idx_sso_config_tenant
+    fields: [tenant_id]
+    unique: true  # One SSO config per tenant
+
+  - name: idx_sso_config_provider
+    fields: [provider]
+
+  - name: idx_sso_config_enabled
+    fields: [enabled]

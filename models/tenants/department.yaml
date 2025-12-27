@@ -1,0 +1,224 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/models/tenants/department.yaml"
+title: Department
+description: |
+  Department model with hierarchical structure for organizational units.
+  Supports parent-child relationships for building department trees.
+  Based on implementations from Dream Team and Dream Learn.
+
+type: object
+
+required:
+  - id
+  - tenant_id
+  - name
+
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique identifier for the department
+    example: "550e8400-e29b-41d4-a716-446655440002"
+
+  tenant_id:
+    type: string
+    format: uuid
+    description: Reference to the tenant this department belongs to
+    example: "550e8400-e29b-41d4-a716-446655440000"
+
+  name:
+    type: string
+    minLength: 1
+    maxLength: 255
+    description: Display name of the department
+    example: "Engineering"
+
+  code:
+    type: string
+    pattern: "^[A-Z0-9_-]+$"
+    maxLength: 50
+    description: Unique code for the department within the tenant
+    example: "ENG"
+
+  description:
+    type: string
+    maxLength: 1000
+    description: Description of the department's function
+    example: "Software engineering and development team"
+
+  # Hierarchy
+  parent_id:
+    type: string
+    format: uuid
+    description: Reference to parent department (null for root departments)
+    example: "550e8400-e29b-41d4-a716-446655440003"
+
+  path:
+    type: string
+    description: |
+      Materialized path for efficient hierarchy queries.
+      Format: /parent_id/grandparent_id/.../root_id/
+    example: "/550e8400-e29b-41d4-a716-446655440003/"
+
+  level:
+    type: integer
+    minimum: 0
+    default: 0
+    description: Depth level in hierarchy (0 = root)
+    example: 1
+
+  # Department Head/Manager
+  head_user_id:
+    type: string
+    format: uuid
+    description: User ID of the department head/manager
+    example: "550e8400-e29b-41d4-a716-446655440004"
+
+  # Status
+  is_active:
+    type: boolean
+    default: true
+    description: Whether the department is currently active
+
+  # Ordering
+  sort_order:
+    type: integer
+    default: 0
+    description: Order for display within same parent level
+
+  # Location (optional)
+  location_id:
+    type: string
+    format: uuid
+    description: Primary location/office for this department
+
+  # Cost Center (for accounting)
+  cost_center:
+    type: string
+    maxLength: 50
+    description: Cost center code for budgeting/accounting
+    example: "CC-ENG-001"
+
+  # Settings (extensible)
+  settings:
+    type: object
+    additionalProperties: true
+    description: Department-specific settings
+    example:
+      approval_required_for_leave: true
+      max_wfh_days_per_week: 3
+
+  # Metadata (extensible)
+  metadata:
+    type: object
+    additionalProperties: true
+    description: Additional custom metadata
+
+  # Timestamps
+  created_at:
+    type: string
+    format: date-time
+    description: When the department was created
+
+  updated_at:
+    type: string
+    format: date-time
+    description: When the department was last updated
+
+  deleted_at:
+    type: string
+    format: date-time
+    description: When the department was soft-deleted (null if active)
+
+  # Audit
+  created_by:
+    type: string
+    format: uuid
+    description: User ID who created the department
+
+  updated_by:
+    type: string
+    format: uuid
+    description: User ID who last updated the department
+
+# Database indexes
+indexes:
+  - name: idx_department_tenant
+    fields: [tenant_id]
+
+  - name: idx_department_tenant_code
+    fields: [tenant_id, code]
+    unique: true
+
+  - name: idx_department_parent
+    fields: [parent_id]
+
+  - name: idx_department_path
+    fields: [path]
+    description: For efficient hierarchy queries using LIKE 'path%'
+
+  - name: idx_department_head
+    fields: [head_user_id]
+
+  - name: idx_department_active
+    fields: [tenant_id, is_active]
+
+  - name: idx_department_level
+    fields: [tenant_id, level]
+
+# Additional Types
+definitions:
+  DepartmentSummary:
+    type: object
+    description: Minimal department info for lists and references
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+      code:
+        type: string
+      level:
+        type: integer
+
+  DepartmentTree:
+    type: object
+    description: Department with nested children for tree view
+    allOf:
+      - $ref: "#"
+      - type: object
+        properties:
+          children:
+            type: array
+            items:
+              $ref: "#/definitions/DepartmentTree"
+          member_count:
+            type: integer
+            description: Number of users in this department
+          total_member_count:
+            type: integer
+            description: Number of users including all sub-departments
+
+  DepartmentWithHead:
+    type: object
+    description: Department with head user details
+    allOf:
+      - $ref: "#"
+      - type: object
+        properties:
+          head:
+            type: object
+            description: Head user details
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              email:
+                type: string
+                format: email
+              avatar_url:
+                type: string
+                format: uri

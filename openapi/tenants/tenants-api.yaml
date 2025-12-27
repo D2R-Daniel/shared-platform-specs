@@ -1,0 +1,829 @@
+openapi: 3.0.3
+info:
+  title: Tenant Management API
+  description: |
+    API for managing tenants (organizations) and their SSO configurations.
+    Supports multi-tenant isolation, subscription plans, and SSO/SCIM integration.
+  version: 1.0.0
+  contact:
+    name: Platform Team
+    email: platform@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: https://api.staging.example.com/v1
+    description: Staging server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Tenants
+    description: Tenant/Organization management
+  - name: SSO
+    description: Single Sign-On configuration
+
+paths:
+  /tenants:
+    get:
+      tags: [Tenants]
+      summary: List tenants
+      description: |
+        List all tenants. Requires super_admin role.
+        Supports pagination, filtering, and search.
+      operationId: listTenants
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TenantStatus'
+          description: Filter by status
+        - name: plan
+          in: query
+          schema:
+            $ref: '#/components/schemas/SubscriptionPlan'
+          description: Filter by subscription plan
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in name, slug, or domain
+      responses:
+        '200':
+          description: List of tenants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Tenants]
+      summary: Create tenant
+      description: Create a new tenant. Requires super_admin role.
+      operationId: createTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict - slug or domain already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tenants/{tenantId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdParam'
+
+    get:
+      tags: [Tenants]
+      summary: Get tenant
+      description: Get tenant details by ID
+      operationId: getTenant
+      responses:
+        '200':
+          description: Tenant details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Tenants]
+      summary: Update tenant
+      description: Update tenant details
+      operationId: updateTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Tenants]
+      summary: Delete tenant
+      description: Soft-delete a tenant. Requires super_admin role.
+      operationId: deleteTenant
+      responses:
+        '204':
+          description: Tenant deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{tenantId}/status:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdParam'
+
+    patch:
+      tags: [Tenants]
+      summary: Update tenant status
+      description: Update tenant status (activate, suspend, etc.)
+      operationId: updateTenantStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/TenantStatus'
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Reason for status change
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{tenantId}/sso:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdParam'
+
+    get:
+      tags: [SSO]
+      summary: Get SSO configuration
+      description: Get SSO configuration for a tenant
+      operationId: getSSOConfig
+      responses:
+        '200':
+          description: SSO configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SSOConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Tenant or SSO config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags: [SSO]
+      summary: Update SSO configuration
+      description: Create or update SSO configuration for a tenant
+      operationId: updateSSOConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSSOConfigRequest'
+      responses:
+        '200':
+          description: SSO configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SSOConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [SSO]
+      summary: Delete SSO configuration
+      description: Remove SSO configuration from a tenant
+      operationId: deleteSSOConfig
+      responses:
+        '204':
+          description: SSO configuration deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{tenantId}/sso/test:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdParam'
+
+    post:
+      tags: [SSO]
+      summary: Test SSO connection
+      description: Test the SSO configuration by attempting to connect to the IdP
+      operationId: testSSOConnection
+      responses:
+        '200':
+          description: SSO connection test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  details:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: SSO not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{tenantId}/sso/sync:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdParam'
+
+    post:
+      tags: [SSO]
+      summary: Trigger user sync
+      description: Manually trigger a user sync from the IdP
+      operationId: triggerSSOSync
+      responses:
+        '202':
+          description: Sync initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sync_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending, in_progress]
+                  started_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: SSO/SCIM not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TenantIdParam:
+      name: tenantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Tenant ID
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page
+
+    SortParam:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: created_at:desc
+      description: Sort field and direction (e.g., name:asc, created_at:desc)
+
+  schemas:
+    TenantStatus:
+      type: string
+      enum:
+        - active
+        - inactive
+        - suspended
+        - pending
+
+    SubscriptionPlan:
+      type: string
+      enum:
+        - free
+        - basic
+        - pro
+        - enterprise
+
+    SSOProvider:
+      type: string
+      enum:
+        - azure_ad
+        - okta
+        - google
+        - saml
+        - oidc
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        domain:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+        primary_color:
+          type: string
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        status_reason:
+          type: string
+        plan:
+          $ref: '#/components/schemas/SubscriptionPlan'
+        billing_cycle:
+          type: string
+          enum: [monthly, annual]
+        contract_end_date:
+          type: string
+          format: date-time
+        primary_contact:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+        industry:
+          type: string
+        company_size:
+          type: string
+        features:
+          type: object
+          properties:
+            sso_enabled:
+              type: boolean
+            scim_enabled:
+              type: boolean
+            custom_branding_enabled:
+              type: boolean
+            analytics_enabled:
+              type: boolean
+            max_users:
+              type: integer
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TenantSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        plan:
+          $ref: '#/components/schemas/SubscriptionPlan'
+        user_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    TenantListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateTenantRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        slug:
+          type: string
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          minLength: 2
+          maxLength: 100
+        domain:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        plan:
+          $ref: '#/components/schemas/SubscriptionPlan'
+        primary_contact:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+        industry:
+          type: string
+        company_size:
+          type: string
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        domain:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        plan:
+          $ref: '#/components/schemas/SubscriptionPlan'
+        billing_cycle:
+          type: string
+          enum: [monthly, annual]
+        primary_contact:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+        industry:
+          type: string
+        company_size:
+          type: string
+        features:
+          type: object
+          properties:
+            custom_branding_enabled:
+              type: boolean
+            analytics_enabled:
+              type: boolean
+            max_users:
+              type: integer
+        settings:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    SSOConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        provider:
+          $ref: '#/components/schemas/SSOProvider'
+        enabled:
+          type: boolean
+        display_name:
+          type: string
+        azure_ad:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            client_id:
+              type: string
+            # client_secret is never returned
+        okta:
+          type: object
+          properties:
+            domain:
+              type: string
+            client_id:
+              type: string
+            authorization_server:
+              type: string
+        google:
+          type: object
+          properties:
+            client_id:
+              type: string
+            hosted_domain:
+              type: string
+        saml:
+          type: object
+          properties:
+            metadata_url:
+              type: string
+              format: uri
+            entity_id:
+              type: string
+            sso_url:
+              type: string
+              format: uri
+        scim:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            base_url:
+              type: string
+              format: uri
+            sync_groups:
+              type: boolean
+        jit_provisioning:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            default_role_id:
+              type: string
+              format: uuid
+            default_department_id:
+              type: string
+              format: uuid
+        attribute_mappings:
+          type: object
+          additionalProperties:
+            type: string
+        last_sync_at:
+          type: string
+          format: date-time
+        sync_frequency:
+          type: string
+          enum: [manual, hourly, daily, weekly]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateSSOConfigRequest:
+      type: object
+      required:
+        - provider
+      properties:
+        provider:
+          $ref: '#/components/schemas/SSOProvider'
+        enabled:
+          type: boolean
+        display_name:
+          type: string
+        azure_ad:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            client_id:
+              type: string
+            client_secret:
+              type: string
+              description: Only set when creating/updating. Never returned.
+        okta:
+          type: object
+          properties:
+            domain:
+              type: string
+            client_id:
+              type: string
+            client_secret:
+              type: string
+            authorization_server:
+              type: string
+        google:
+          type: object
+          properties:
+            client_id:
+              type: string
+            client_secret:
+              type: string
+            hosted_domain:
+              type: string
+        saml:
+          type: object
+          properties:
+            metadata_url:
+              type: string
+              format: uri
+            entity_id:
+              type: string
+            sso_url:
+              type: string
+              format: uri
+            certificate:
+              type: string
+        scim:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            sync_groups:
+              type: boolean
+        jit_provisioning:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            default_role_id:
+              type: string
+              format: uuid
+            default_department_id:
+              type: string
+              format: uuid
+        attribute_mappings:
+          type: object
+          additionalProperties:
+            type: string
+        sync_frequency:
+          type: string
+          enum: [manual, hourly, daily, weekly]
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

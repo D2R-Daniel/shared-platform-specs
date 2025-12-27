@@ -4,6 +4,8 @@
 
 export type UserStatus = 'active' | 'inactive' | 'pending' | 'suspended' | 'deleted';
 
+export type IdentityProvider = 'local' | 'google' | 'microsoft' | 'okta' | 'saml' | 'oidc';
+
 export interface User {
   id: string;
   email: string;
@@ -19,6 +21,18 @@ export interface User {
   teamId?: string;
   teamName?: string;
   tenantId?: string;
+
+  // Organization
+  departmentId?: string;
+  managerId?: string;
+
+  // SSO / External Identity
+  identityProvider?: IdentityProvider;
+  externalId?: string;
+  entraObjectId?: string;
+  entraUpn?: string;
+  ssoLastSyncAt?: string;
+
   metadata?: Record<string, any>;
   lastLoginAt?: string;
   createdAt: string;

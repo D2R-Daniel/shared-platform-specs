@@ -18,6 +18,17 @@ class UserStatus(str, Enum):
     DELETED = "deleted"
 
 
+class IdentityProvider(str, Enum):
+    """Authentication provider types."""
+
+    LOCAL = "local"
+    GOOGLE = "google"
+    MICROSOFT = "microsoft"
+    OKTA = "okta"
+    SAML = "saml"
+    OIDC = "oidc"
+
+
 class User(BaseModel):
     """Full user model."""
 
@@ -32,9 +43,21 @@ class User(BaseModel):
     phone_verified: bool = False
     status: UserStatus = UserStatus.PENDING
     roles: list[str] = Field(default_factory=list)
+
+    # Organization
+    tenant_id: Optional[str] = None
+    department_id: Optional[str] = None
     team_id: Optional[str] = None
     team_name: Optional[str] = None
-    tenant_id: Optional[str] = None
+    manager_id: Optional[str] = None
+
+    # SSO / External Identity
+    identity_provider: Optional[IdentityProvider] = None
+    external_id: Optional[str] = Field(None, description="ID from external IdP")
+    entra_object_id: Optional[str] = Field(None, description="Microsoft Entra ID Object ID")
+    entra_upn: Optional[str] = Field(None, description="Microsoft Entra ID User Principal Name")
+    sso_last_sync_at: Optional[datetime] = None
+
     metadata: dict[str, Any] = Field(default_factory=dict)
     last_login_at: Optional[datetime] = None
     created_at: datetime

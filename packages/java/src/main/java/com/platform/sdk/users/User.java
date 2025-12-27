@@ -15,6 +15,18 @@ public class User {
     private String status;
     private List<String> roles;
     private String tenantId;
+
+    // Organization
+    private String departmentId;
+    private String managerId;
+
+    // SSO / External Identity
+    private IdentityProvider identityProvider;
+    private String externalId;
+    private String entraObjectId;
+    private String entraUpn;
+    private Instant ssoLastSyncAt;
+
     private Instant createdAt;
     private Instant updatedAt;
     private Instant lastLoginAt;
@@ -109,5 +121,61 @@ public class User {
 
     public void setMetadata(Map<String, Object> metadata) {
         this.metadata = metadata;
+    }
+
+    public String getDepartmentId() {
+        return departmentId;
+    }
+
+    public void setDepartmentId(String departmentId) {
+        this.departmentId = departmentId;
+    }
+
+    public String getManagerId() {
+        return managerId;
+    }
+
+    public void setManagerId(String managerId) {
+        this.managerId = managerId;
+    }
+
+    public IdentityProvider getIdentityProvider() {
+        return identityProvider;
+    }
+
+    public void setIdentityProvider(IdentityProvider identityProvider) {
+        this.identityProvider = identityProvider;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
+    }
+
+    public String getEntraObjectId() {
+        return entraObjectId;
+    }
+
+    public void setEntraObjectId(String entraObjectId) {
+        this.entraObjectId = entraObjectId;
+    }
+
+    public String getEntraUpn() {
+        return entraUpn;
+    }
+
+    public void setEntraUpn(String entraUpn) {
+        this.entraUpn = entraUpn;
+    }
+
+    public Instant getSsoLastSyncAt() {
+        return ssoLastSyncAt;
+    }
+
+    public void setSsoLastSyncAt(Instant ssoLastSyncAt) {
+        this.ssoLastSyncAt = ssoLastSyncAt;
     }
 }

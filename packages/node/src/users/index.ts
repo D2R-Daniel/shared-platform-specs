@@ -11,6 +11,7 @@ export type {
   UserProfile,
   UserPreferences,
   UserStatus,
+  IdentityProvider,
   CreateUserRequest,
   UpdateUserRequest,
   InviteUserRequest,

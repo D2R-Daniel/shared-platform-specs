@@ -1,0 +1,240 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/models/tenants/tenant.yaml"
+title: Tenant
+description: |
+  Tenant/Organization model for multi-tenant isolation.
+  Each tenant represents a separate organization or company using the platform.
+  Based on patterns from Dream Team (Tenant) and Dream Learn (Organization).
+
+type: object
+
+required:
+  - id
+  - name
+  - slug
+  - status
+
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique identifier for the tenant
+    example: "550e8400-e29b-41d4-a716-446655440000"
+
+  name:
+    type: string
+    minLength: 1
+    maxLength: 255
+    description: Display name of the tenant/organization
+    example: "Acme Corporation"
+
+  slug:
+    type: string
+    pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    minLength: 2
+    maxLength: 100
+    description: URL-friendly unique identifier (lowercase, hyphens only)
+    example: "acme-corp"
+
+  domain:
+    type: string
+    format: hostname
+    description: Custom domain for the tenant (optional)
+    example: "acme.example.com"
+
+  logo_url:
+    type: string
+    format: uri
+    description: URL to the tenant's logo image
+    example: "https://cdn.example.com/logos/acme.png"
+
+  primary_color:
+    type: string
+    pattern: "^#[0-9A-Fa-f]{6}$"
+    description: Primary brand color (hex format)
+    example: "#3B82F6"
+
+  status:
+    type: string
+    enum:
+      - active
+      - inactive
+      - suspended
+      - pending
+    default: pending
+    description: |
+      Current status of the tenant:
+      - active: Fully operational
+      - inactive: Deactivated by admin
+      - suspended: Temporarily suspended (e.g., payment issues)
+      - pending: Awaiting activation/verification
+
+  status_reason:
+    type: string
+    maxLength: 500
+    description: Reason for current status (especially for suspended/inactive)
+
+  plan:
+    type: string
+    enum:
+      - free
+      - basic
+      - pro
+      - enterprise
+    default: basic
+    description: Subscription plan level
+
+  billing_cycle:
+    type: string
+    enum:
+      - monthly
+      - annual
+    default: monthly
+    description: Billing frequency
+
+  contract_end_date:
+    type: string
+    format: date-time
+    description: End date of current contract/subscription
+
+  # Contact Information
+  primary_contact:
+    type: object
+    description: Primary contact person for the tenant
+    properties:
+      name:
+        type: string
+        maxLength: 255
+      email:
+        type: string
+        format: email
+      phone:
+        type: string
+        maxLength: 50
+
+  # Address
+  address:
+    type: object
+    properties:
+      street:
+        type: string
+      city:
+        type: string
+      state:
+        type: string
+      country:
+        type: string
+      postal_code:
+        type: string
+
+  # Industry/Company Info
+  industry:
+    type: string
+    maxLength: 100
+    description: Industry vertical
+    example: "Technology"
+
+  company_size:
+    type: string
+    enum:
+      - "1-10"
+      - "11-50"
+      - "51-200"
+      - "201-500"
+      - "501-1000"
+      - "1001-5000"
+      - "5000+"
+    description: Number of employees
+
+  # Feature Flags
+  features:
+    type: object
+    description: Feature flags and limits for this tenant
+    properties:
+      sso_enabled:
+        type: boolean
+        default: false
+        description: Whether SSO is enabled for this tenant
+      scim_enabled:
+        type: boolean
+        default: false
+        description: Whether SCIM provisioning is enabled
+      custom_branding_enabled:
+        type: boolean
+        default: false
+        description: Whether custom branding is allowed
+      analytics_enabled:
+        type: boolean
+        default: true
+        description: Whether analytics features are enabled
+      max_users:
+        type: integer
+        minimum: 0
+        description: Maximum number of users allowed (0 = unlimited)
+      max_storage_gb:
+        type: integer
+        minimum: 0
+        description: Maximum storage in GB (0 = unlimited)
+
+  # Settings (extensible)
+  settings:
+    type: object
+    additionalProperties: true
+    description: Tenant-specific settings (JSON object)
+    example:
+      timezone: "America/New_York"
+      date_format: "MM/DD/YYYY"
+      default_language: "en-US"
+
+  # Metadata (extensible)
+  metadata:
+    type: object
+    additionalProperties: true
+    description: Additional custom metadata
+
+  # Timestamps
+  created_at:
+    type: string
+    format: date-time
+    description: When the tenant was created
+
+  updated_at:
+    type: string
+    format: date-time
+    description: When the tenant was last updated
+
+  deleted_at:
+    type: string
+    format: date-time
+    description: When the tenant was soft-deleted (null if active)
+
+  # Audit
+  created_by:
+    type: string
+    format: uuid
+    description: User ID who created the tenant
+
+  updated_by:
+    type: string
+    format: uuid
+    description: User ID who last updated the tenant
+
+# Database indexes (for implementation reference)
+indexes:
+  - name: idx_tenant_slug
+    fields: [slug]
+    unique: true
+
+  - name: idx_tenant_domain
+    fields: [domain]
+    unique: true
+    sparse: true  # Only index non-null values
+
+  - name: idx_tenant_status
+    fields: [status]
+
+  - name: idx_tenant_plan
+    fields: [plan]
+
+  - name: idx_tenant_created_at
+    fields: [created_at]

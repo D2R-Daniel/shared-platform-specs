@@ -19,6 +19,7 @@ export { UserClient } from './users';
 export { NotificationClient } from './notifications';
 export { AuditClient } from './audit';
 export { FeatureFlagClient } from './features';
+export { TenantClient, DepartmentClient } from './tenants';
 
 export type {
   // Auth types
@@ -71,5 +72,24 @@ export type {
   EvaluationContext,
   TargetingRule,
 } from './features';
+
+export type {
+  // Tenant types
+  Tenant,
+  TenantSummary,
+  TenantStatus,
+  SubscriptionPlan,
+  TenantFeatures,
+  SSOConfig,
+  SSOProvider,
+  Department,
+  DepartmentSummary,
+  DepartmentTree,
+  DepartmentWithDetails,
+  CreateTenantRequest,
+  UpdateTenantRequest,
+  CreateDepartmentRequest,
+  UpdateDepartmentRequest,
+} from './tenants';
 
 export const VERSION = '0.1.0';
