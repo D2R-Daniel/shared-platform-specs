@@ -5,7 +5,7 @@ A unified SDK monorepo for authentication, user management, and notifications ac
 ## Architecture
 
 ```
-shared-platform-specs/
+shared-platform-sdk/
 ├── openapi/          # REST API specifications (OpenAPI 3.0)
 ├── events/           # Event schemas (Avro)
 ├── models/           # Shared data models
@@ -214,7 +214,7 @@ make publish-java     # to Maven Central
 ## Repository Structure
 
 ```
-shared-platform-specs/
+shared-platform-sdk/
 ├── openapi/                    # REST API contracts (OpenAPI 3.0)
 │   ├── auth/                   # Authentication endpoints
 │   ├── users/                  # User management endpoints

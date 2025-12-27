@@ -11,7 +11,7 @@
 
     <name>Shared Platform SDK</name>
     <description>Shared platform SDK for authentication, user management, and notifications</description>
-    <url>https://github.com/D2R-Daniel/shared-platform-specs</url>
+    <url>https://github.com/D2R-Daniel/shared-platform-sdk</url>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -130,7 +130,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/D2R-Daniel/shared-platform-specs</url>
+            <url>https://maven.pkg.github.com/D2R-Daniel/shared-platform-sdk</url>
         </repository>
     </distributionManagement>
 
@@ -142,8 +142,8 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git://github.com/D2R-Daniel/shared-platform-specs.git</connection>
-        <developerConnection>scm:git:ssh://github.com/D2R-Daniel/shared-platform-specs.git</developerConnection>
-        <url>https://github.com/D2R-Daniel/shared-platform-specs</url>
+        <connection>scm:git:git://github.com/D2R-Daniel/shared-platform-sdk.git</connection>
+        <developerConnection>scm:git:ssh://github.com/D2R-Daniel/shared-platform-sdk.git</developerConnection>
+        <url>https://github.com/D2R-Daniel/shared-platform-sdk</url>
     </scm>
 </project>
