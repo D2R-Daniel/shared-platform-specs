@@ -2,6 +2,8 @@
 Authentication client for OAuth2/OIDC operations.
 """
 
+from __future__ import annotations
+
 from typing import Optional
 from datetime import datetime, timedelta
 import httpx

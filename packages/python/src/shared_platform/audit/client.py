@@ -1,5 +1,7 @@
 """Audit logging client for tracking user actions and system events."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
 

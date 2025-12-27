@@ -6,13 +6,15 @@ from datetime import datetime, timedelta
 
 
 @pytest.fixture
-def mock_httpx_client():
-    """Mock httpx.AsyncClient for testing."""
-    with patch("httpx.AsyncClient") as mock:
-        client = MagicMock()
-        mock.return_value.__aenter__.return_value = client
-        mock.return_value.__aexit__.return_value = None
-        yield client
+def mock_httpx_response():
+    """Create a mock httpx response."""
+    def _create(status_code=200, json_data=None):
+        response = MagicMock()
+        response.status_code = status_code
+        response.json.return_value = json_data or {}
+        response.raise_for_status = MagicMock()
+        return response
+    return _create
 
 
 @pytest.fixture

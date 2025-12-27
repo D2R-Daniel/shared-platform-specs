@@ -1,6 +1,7 @@
 """Tests for the notifications module."""
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
+from datetime import datetime
 
 from shared_platform.notifications import (
     NotificationClient,
@@ -11,6 +12,12 @@ from shared_platform.notifications.events import (
     EmailNotificationEvent,
     SMSNotificationEvent,
     PushNotificationEvent,
+    EmailRecipient,
+    EmailTemplate,
+    SMSRecipient,
+    PushTarget,
+    PushNotification,
+    EventSource,
 )
 
 
@@ -34,11 +41,12 @@ class TestNotification:
             type="in_app",
             category="account",
             title="Test",
-            read=False,
+            created_at=datetime.now(),
         )
 
         assert notification.id == "notif-123"
         assert notification.body is None
+        assert notification.read is False
 
 
 class TestNotificationPreferences:
@@ -48,18 +56,19 @@ class TestNotificationPreferences:
         """Test default preferences."""
         prefs = NotificationPreferences()
 
-        assert prefs.email_enabled is None
-        assert prefs.push_enabled is None
+        assert prefs.email_enabled is True
+        assert prefs.push_enabled is True
+        assert prefs.digest_frequency == "realtime"
 
     def test_preferences_with_values(self):
         """Test preferences with values."""
         prefs = NotificationPreferences(
-            email_enabled=True,
+            email_enabled=False,
             push_enabled=True,
             digest_frequency="daily",
         )
 
-        assert prefs.email_enabled is True
+        assert prefs.email_enabled is False
         assert prefs.push_enabled is True
         assert prefs.digest_frequency == "daily"
 
@@ -72,33 +81,31 @@ class TestNotificationEvents:
         event = EmailNotificationEvent(
             event_id="evt-123",
             event_type="TRANSACTIONAL",
-            timestamp="2024-01-01T00:00:00Z",
             tenant_id="tenant-456",
-            recipient={"email": "user@example.com", "name": "Test User"},
-            template={"template_id": "welcome", "variables": {"name": "Test"}},
+            recipient=EmailRecipient(email="user@example.com", name="Test User"),
+            template=EmailTemplate(template_id="welcome", variables={"name": "Test"}),
             category="account",
-            source={"service": "user-service", "action": "user_registered"},
+            source=EventSource(service="user-service", action="user_registered"),
         )
 
         assert event.event_id == "evt-123"
-        assert event.event_type == "TRANSACTIONAL"
-        assert event.recipient["email"] == "user@example.com"
+        assert event.event_type.value == "TRANSACTIONAL"
+        assert event.recipient.email == "user@example.com"
 
     def test_sms_event(self):
         """Test SMSNotificationEvent creation."""
         event = SMSNotificationEvent(
             event_id="evt-123",
             event_type="OTP",
-            timestamp="2024-01-01T00:00:00Z",
             tenant_id="tenant-456",
-            recipient={"phone_number": "+1234567890"},
+            recipient=SMSRecipient(phone_number="+1234567890"),
             message="Your OTP is 123456",
             category="security",
-            source={"service": "auth-service", "action": "otp_requested"},
+            source=EventSource(service="auth-service", action="otp_requested"),
         )
 
         assert event.event_id == "evt-123"
-        assert event.event_type == "OTP"
+        assert event.event_type.value == "OTP"
         assert event.message == "Your OTP is 123456"
 
     def test_push_event(self):
@@ -106,17 +113,33 @@ class TestNotificationEvents:
         event = PushNotificationEvent(
             event_id="evt-123",
             event_type="ALERT",
-            timestamp="2024-01-01T00:00:00Z",
             tenant_id="tenant-456",
-            target={"user_id": "user-123"},
-            notification={"title": "Alert", "body": "Something happened"},
+            target=PushTarget(user_id="user-123"),
+            notification=PushNotification(title="Alert", body="Something happened"),
             category="alerts",
-            source={"service": "monitor-service", "action": "alert_triggered"},
+            source=EventSource(service="monitor-service", action="alert_triggered"),
         )
 
         assert event.event_id == "evt-123"
-        assert event.event_type == "ALERT"
-        assert event.notification["title"] == "Alert"
+        assert event.event_type.value == "ALERT"
+        assert event.notification.title == "Alert"
+
+    def test_event_to_dict(self):
+        """Test event serialization."""
+        event = EmailNotificationEvent(
+            event_id="evt-123",
+            tenant_id="tenant-456",
+            recipient=EmailRecipient(email="user@example.com"),
+            template=EmailTemplate(template_id="welcome"),
+            category="account",
+            source=EventSource(service="test", action="test"),
+        )
+
+        data = event.to_dict()
+
+        assert isinstance(data, dict)
+        assert data["event_id"] == "evt-123"
+        assert data["recipient"]["email"] == "user@example.com"
 
 
 class TestNotificationClient:
@@ -124,124 +147,289 @@ class TestNotificationClient:
 
     @pytest.fixture
     def client(self):
-        """Create a NotificationClient instance."""
-        return NotificationClient(
-            base_url="https://api.example.com",
-            access_token="test-token",
-        )
+        """Create a NotificationClient instance with mocked HTTP."""
+        with patch("httpx.Client") as mock_client:
+            mock_instance = MagicMock()
+            mock_client.return_value = mock_instance
+            notif_client = NotificationClient(
+                base_url="https://api.example.com",
+                access_token="test-token",
+            )
+            notif_client._http = mock_instance
+            yield notif_client
 
-    @pytest.mark.asyncio
-    async def test_list_notifications(self, client, sample_notification_dict):
+    def test_list_notifications(self, client, sample_notification_dict, mock_httpx_response):
         """Test listing notifications."""
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
                 "data": [sample_notification_dict],
                 "pagination": {
                     "page": 1,
                     "page_size": 20,
                     "total_items": 1,
                     "total_pages": 1,
+                    "has_next": False,
+                    "has_previous": False,
                 },
-            }
-            mock_response.raise_for_status = MagicMock()
+            },
+        )
+        client._http.get.return_value = mock_response
 
-            mock_instance = AsyncMock()
-            mock_instance.get = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__.return_value = mock_instance
-            mock_client.return_value.__aexit__.return_value = None
+        result = client.list()
 
-            result = await client.list()
+        assert len(result.data) == 1
+        assert result.data[0].id == "notif-123"
 
-            assert len(result.data) == 1
-            assert result.data[0].id == "notif-123"
+    def test_get_notification(self, client, sample_notification_dict, mock_httpx_response):
+        """Test getting a single notification."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data=sample_notification_dict,
+        )
+        client._http.get.return_value = mock_response
 
-    @pytest.mark.asyncio
-    async def test_mark_as_read(self, client, sample_notification_dict):
+        notification = client.get("notif-123")
+
+        assert notification.id == "notif-123"
+        assert notification.title == "Welcome"
+
+    def test_mark_as_read(self, client, sample_notification_dict, mock_httpx_response):
         """Test marking notification as read."""
         read_notification = {**sample_notification_dict, "read": True}
+        mock_response = mock_httpx_response(status_code=200, json_data=read_notification)
+        client._http.post.return_value = mock_response
 
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = read_notification
-            mock_response.raise_for_status = MagicMock()
+        notification = client.mark_as_read("notif-123")
 
-            mock_instance = AsyncMock()
-            mock_instance.patch = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__.return_value = mock_instance
-            mock_client.return_value.__aexit__.return_value = None
+        assert notification.read is True
 
-            notification = await client.mark_as_read("notif-123")
+    def test_mark_all_as_read(self, client, mock_httpx_response):
+        """Test marking all notifications as read."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={"updated_count": 5},
+        )
+        client._http.post.return_value = mock_response
 
-            assert notification.read is True
+        count = client.mark_all_as_read()
 
-    @pytest.mark.asyncio
-    async def test_get_unread_count(self, client):
+        assert count == 5
+
+    def test_delete_notification(self, client, mock_httpx_response):
+        """Test deleting a notification."""
+        mock_response = mock_httpx_response(status_code=204)
+        client._http.delete.return_value = mock_response
+
+        # Should not raise
+        client.delete("notif-123")
+
+    def test_get_unread_count(self, client, mock_httpx_response):
         """Test getting unread notification count."""
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"count": 5}
-            mock_response.raise_for_status = MagicMock()
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={"count": 5},
+        )
+        client._http.get.return_value = mock_response
 
-            mock_instance = AsyncMock()
-            mock_instance.get = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__.return_value = mock_instance
-            mock_client.return_value.__aexit__.return_value = None
+        result = client.get_unread_count()
 
-            result = await client.get_unread_count()
+        assert result["count"] == 5
 
-            assert result["count"] == 5
-
-    @pytest.mark.asyncio
-    async def test_get_preferences(self, client):
+    def test_get_preferences(self, client, mock_httpx_response):
         """Test getting notification preferences."""
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
                 "email_enabled": True,
                 "push_enabled": True,
                 "digest_frequency": "daily",
-            }
-            mock_response.raise_for_status = MagicMock()
+            },
+        )
+        client._http.get.return_value = mock_response
 
-            mock_instance = AsyncMock()
-            mock_instance.get = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__.return_value = mock_instance
-            mock_client.return_value.__aexit__.return_value = None
+        prefs = client.get_preferences()
 
-            prefs = await client.get_preferences()
+        assert prefs.email_enabled is True
+        assert prefs.digest_frequency == "daily"
 
-            assert prefs.email_enabled is True
-            assert prefs.digest_frequency == "daily"
+    def test_update_preferences(self, client, mock_httpx_response):
+        """Test updating notification preferences."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
+                "email_enabled": False,
+                "push_enabled": True,
+                "digest_frequency": "weekly",
+            },
+        )
+        client._http.put.return_value = mock_response
 
-    @pytest.mark.asyncio
-    async def test_register_device(self, client):
+        prefs = client.update_preferences(email_enabled=False, digest_frequency="weekly")
+
+        assert prefs.email_enabled is False
+        assert prefs.digest_frequency == "weekly"
+
+    def test_list_categories(self, client, mock_httpx_response):
+        """Test listing notification categories."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
+                "categories": [
+                    {
+                        "id": "account",
+                        "name": "Account",
+                        "description": "Account-related notifications",
+                    }
+                ]
+            },
+        )
+        client._http.get.return_value = mock_response
+
+        categories = client.list_categories()
+
+        assert len(categories) == 1
+        assert categories[0].id == "account"
+
+    def test_list_subscriptions(self, client, mock_httpx_response):
+        """Test listing subscriptions."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
+                "subscriptions": [
+                    {
+                        "id": "sub-123",
+                        "channel": "email",
+                        "topic": "alerts",
+                        "subscribed_at": "2024-01-01T00:00:00Z",
+                    }
+                ]
+            },
+        )
+        client._http.get.return_value = mock_response
+
+        subscriptions = client.list_subscriptions()
+
+        assert len(subscriptions) == 1
+        assert subscriptions[0].channel == "email"
+
+    def test_subscribe(self, client, mock_httpx_response):
+        """Test subscribing to a channel."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
+                "id": "sub-123",
+                "channel": "push",
+                "topic": "updates",
+                "subscribed_at": "2024-01-01T00:00:00Z",
+            },
+        )
+        client._http.post.return_value = mock_response
+
+        subscription = client.subscribe("push", "updates")
+
+        assert subscription.channel == "push"
+        assert subscription.topic == "updates"
+
+    def test_unsubscribe(self, client, mock_httpx_response):
+        """Test unsubscribing from a channel."""
+        mock_response = mock_httpx_response(status_code=204)
+        client._http.delete.return_value = mock_response
+
+        # Should not raise
+        client.unsubscribe("sub-123")
+
+    def test_list_devices(self, client, mock_httpx_response):
+        """Test listing registered devices."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={
+                "devices": [
+                    {
+                        "id": "device-123",
+                        "platform": "android",
+                        "name": "My Phone",
+                        "registered_at": "2024-01-01T00:00:00Z",
+                    }
+                ]
+            },
+        )
+        client._http.get.return_value = mock_response
+
+        devices = client.list_devices()
+
+        assert len(devices) == 1
+        assert devices[0].platform == "android"
+
+    def test_register_device(self, client, mock_httpx_response):
         """Test registering a device for push notifications."""
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 201
-            mock_response.json.return_value = {
+        mock_response = mock_httpx_response(
+            status_code=201,
+            json_data={
                 "id": "device-123",
                 "platform": "android",
                 "name": "My Phone",
                 "registered_at": "2024-01-01T00:00:00Z",
-            }
-            mock_response.raise_for_status = MagicMock()
+            },
+        )
+        client._http.post.return_value = mock_response
 
-            mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__.return_value = mock_instance
-            mock_client.return_value.__aexit__.return_value = None
+        device = client.register_device(
+            token="fcm-token",
+            platform="android",
+            name="My Phone",
+        )
 
-            device = await client.register_device(
-                token="fcm-token",
-                platform="android",
-                name="My Phone",
+        assert device.id == "device-123"
+        assert device.platform == "android"
+
+    def test_unregister_device(self, client, mock_httpx_response):
+        """Test unregistering a device."""
+        mock_response = mock_httpx_response(status_code=204)
+        client._http.delete.return_value = mock_response
+
+        # Should not raise
+        client.unregister_device("device-123")
+
+    def test_send_test(self, client, mock_httpx_response):
+        """Test sending a test notification."""
+        mock_response = mock_httpx_response(
+            status_code=200,
+            json_data={"message": "Test notification sent"},
+        )
+        client._http.post.return_value = mock_response
+
+        result = client.send_test("push", "Hello!")
+
+        assert "message" in result
+
+    def test_set_access_token(self):
+        """Test setting access token."""
+        with patch("httpx.Client") as mock_client:
+            mock_instance = MagicMock()
+            mock_instance.headers = {}  # Use real dict for headers
+            mock_client.return_value = mock_instance
+
+            client = NotificationClient(
+                base_url="https://api.example.com",
+                access_token="test-token",
             )
+            client._http = mock_instance
+            client._http.headers = {"Authorization": "Bearer test-token"}
 
-            assert device.id == "device-123"
-            assert device.platform == "android"
+            client.set_access_token("new-token")
+            assert client._http.headers["Authorization"] == "Bearer new-token"
+
+    def test_context_manager(self, mock_httpx_response):
+        """Test NotificationClient as context manager."""
+        with patch("httpx.Client") as mock_client:
+            mock_instance = MagicMock()
+            mock_client.return_value = mock_instance
+
+            with NotificationClient(
+                base_url="https://api.example.com",
+                access_token="test-token",
+            ) as client:
+                assert client is not None
+
+            mock_instance.close.assert_called_once()

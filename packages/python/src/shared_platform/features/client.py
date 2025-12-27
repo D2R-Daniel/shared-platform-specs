@@ -1,5 +1,7 @@
 """Feature flag client for managing and evaluating feature toggles."""
 
+from __future__ import annotations
+
 from typing import Any, Optional
 
 import httpx
