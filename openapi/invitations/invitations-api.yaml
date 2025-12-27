@@ -1,0 +1,523 @@
+openapi: 3.0.3
+info:
+  title: Invitations API
+  description: |
+    Generic invitation system for user onboarding, team invites, etc.
+    Supports single and bulk invitations with token-based validation.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+paths:
+  /invitations:
+    get:
+      summary: List invitations
+      operationId: listInvitations
+      tags: [Invitations]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, sent, viewed, accepted, expired, revoked, completed]
+        - name: invitation_type
+          in: query
+          schema:
+            type: string
+            enum: [user, team, organization, test, course, custom]
+        - name: target_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: email
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "created_at:desc"
+      responses:
+        '200':
+          description: List of invitations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationListResponse'
+
+    post:
+      summary: Create invitation
+      operationId: createInvitation
+      tags: [Invitations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvitationRequest'
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '409':
+          description: Active invitation already exists for this email
+
+  /invitations/bulk:
+    post:
+      summary: Create bulk invitations
+      operationId: createBulkInvitations
+      tags: [Invitations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkInvitationRequest'
+      responses:
+        '200':
+          description: Bulk invitation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkInvitationResult'
+
+  /invitations/{invitationId}:
+    parameters:
+      - name: invitationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get invitation
+      operationId: getInvitation
+      tags: [Invitations]
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '404':
+          description: Invitation not found
+
+    delete:
+      summary: Revoke invitation
+      operationId: revokeInvitation
+      tags: [Invitations]
+      responses:
+        '204':
+          description: Invitation revoked
+        '404':
+          description: Invitation not found
+
+  /invitations/{invitationId}/resend:
+    parameters:
+      - name: invitationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      summary: Resend invitation
+      operationId: resendInvitation
+      tags: [Invitations]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                extend_expiry:
+                  type: boolean
+                  default: true
+                  description: Extend expiry by default TTL
+      responses:
+        '200':
+          description: Invitation resent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '404':
+          description: Invitation not found
+        '409':
+          description: Cannot resend (already accepted or expired)
+
+  /invitations/validate/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 64
+          maxLength: 64
+
+    get:
+      summary: Validate invitation token
+      operationId: validateToken
+      tags: [Public]
+      description: |
+        Public endpoint to validate an invitation token.
+        Updates status to "viewed" if currently "sent".
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidatedInvitation'
+        '404':
+          description: Token not found
+        '410':
+          description: Token expired or revoked
+
+  /invitations/accept/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 64
+          maxLength: 64
+
+    post:
+      summary: Accept invitation
+      operationId: acceptInvitation
+      tags: [Public]
+      description: |
+        Public endpoint to accept an invitation.
+        May create a user account if needed.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptInvitationResponse'
+        '404':
+          description: Token not found
+        '410':
+          description: Token expired or revoked
+
+  /invitations/cleanup:
+    post:
+      summary: Cleanup expired invitations
+      operationId: cleanupInvitations
+      tags: [Admin]
+      description: |
+        Admin endpoint to expire old invitations and optionally delete archived ones.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expire_pending:
+                  type: boolean
+                  default: true
+                  description: Mark past-due invitations as expired
+                delete_older_than_days:
+                  type: integer
+                  minimum: 30
+                  description: Delete invitations older than this many days
+      responses:
+        '200':
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expired_count:
+                    type: integer
+                  deleted_count:
+                    type: integer
+
+components:
+  schemas:
+    InvitationStatus:
+      type: string
+      enum:
+        - pending
+        - sent
+        - viewed
+        - accepted
+        - expired
+        - revoked
+        - completed
+
+    InvitationType:
+      type: string
+      enum:
+        - user
+        - team
+        - organization
+        - test
+        - course
+        - custom
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: Only returned on creation
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        invitation_type:
+          $ref: '#/components/schemas/InvitationType'
+        target_id:
+          type: string
+          format: uuid
+        target_role:
+          type: string
+        status:
+          $ref: '#/components/schemas/InvitationStatus'
+        message:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        sent_at:
+          type: string
+          format: date-time
+        viewed_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+
+    InvitationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        invitation_type:
+          $ref: '#/components/schemas/InvitationType'
+        status:
+          $ref: '#/components/schemas/InvitationStatus'
+        expires_at:
+          type: string
+          format: date-time
+        sent_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    ValidatedInvitation:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        invitation:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            name:
+              type: string
+            invitation_type:
+              $ref: '#/components/schemas/InvitationType'
+            target_id:
+              type: string
+              format: uuid
+            target_role:
+              type: string
+            message:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+            metadata:
+              type: object
+        error:
+          type: string
+
+    CreateInvitationRequest:
+      type: object
+      required:
+        - email
+        - invitation_type
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          maxLength: 255
+        invitation_type:
+          $ref: '#/components/schemas/InvitationType'
+        target_id:
+          type: string
+          format: uuid
+        target_role:
+          type: string
+          maxLength: 50
+        message:
+          type: string
+          maxLength: 1000
+        expires_in_days:
+          type: integer
+          minimum: 1
+          maximum: 30
+          default: 7
+        send_email:
+          type: boolean
+          default: true
+        metadata:
+          type: object
+
+    BulkInvitationRequest:
+      type: object
+      required:
+        - invitations
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateInvitationRequest'
+          minItems: 1
+          maxItems: 100
+        send_emails:
+          type: boolean
+          default: true
+
+    BulkInvitationResult:
+      type: object
+      properties:
+        successful:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvitationSummary'
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              email:
+                type: string
+              reason:
+                type: string
+        total:
+          type: integer
+        success_count:
+          type: integer
+        failure_count:
+          type: integer
+
+    AcceptInvitationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+        metadata:
+          type: object
+
+    AcceptInvitationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user_id:
+          type: string
+          format: uuid
+        redirect_url:
+          type: string
+        message:
+          type: string
+
+    InvitationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvitationSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean

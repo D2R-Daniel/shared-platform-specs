@@ -1,0 +1,333 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/schemas/invitations/invitation.yaml"
+title: Invitation
+description: |
+  Generic invitation model for user onboarding, team invites, etc.
+  Uses secure token-based validation with configurable expiry.
+
+definitions:
+  InvitationStatus:
+    type: string
+    enum:
+      - pending
+      - sent
+      - viewed
+      - accepted
+      - expired
+      - revoked
+      - completed
+    description: |
+      Invitation lifecycle status:
+      - pending: Created but not sent
+      - sent: Email/notification sent
+      - viewed: Recipient clicked the link
+      - accepted: Recipient accepted the invitation
+      - expired: Past expiry date
+      - revoked: Cancelled by admin
+      - completed: Onboarding finished (if applicable)
+
+  InvitationType:
+    type: string
+    enum:
+      - user
+      - team
+      - organization
+      - test
+      - course
+      - custom
+    description: Type of invitation for routing and processing
+
+  Invitation:
+    type: object
+    required:
+      - tenant_id
+      - email
+      - invitation_type
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique invitation identifier
+      tenant_id:
+        type: string
+        format: uuid
+        description: Tenant this invitation belongs to
+      token:
+        type: string
+        minLength: 64
+        maxLength: 64
+        pattern: "^[a-f0-9]+$"
+        description: |
+          Secure 64-character hex token.
+          Generated using crypto.randomBytes(32).toString('hex')
+      email:
+        type: string
+        format: email
+        description: Recipient email address
+      name:
+        type: string
+        maxLength: 255
+        description: Recipient name (optional, for personalization)
+      invitation_type:
+        $ref: "#/definitions/InvitationType"
+      target_id:
+        type: string
+        format: uuid
+        description: |
+          Target resource ID (team_id, course_id, etc.)
+          Depends on invitation_type
+      target_role:
+        type: string
+        maxLength: 50
+        description: Role to assign upon acceptance (e.g., "member", "admin")
+      status:
+        $ref: "#/definitions/InvitationStatus"
+        default: pending
+      message:
+        type: string
+        maxLength: 1000
+        description: Custom message to include in invitation
+      expires_at:
+        type: string
+        format: date-time
+        description: When the invitation expires
+      sent_at:
+        type: string
+        format: date-time
+        description: When the invitation was sent
+      viewed_at:
+        type: string
+        format: date-time
+        description: When the recipient first viewed the invitation
+      accepted_at:
+        type: string
+        format: date-time
+        description: When the recipient accepted
+      completed_at:
+        type: string
+        format: date-time
+        description: When onboarding was completed (if applicable)
+      metadata:
+        type: object
+        additionalProperties: true
+        description: Custom data per invitation type
+      created_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+        format: uuid
+        description: User who created the invitation
+
+  InvitationSummary:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+      invitation_type:
+        $ref: "#/definitions/InvitationType"
+      status:
+        $ref: "#/definitions/InvitationStatus"
+      expires_at:
+        type: string
+        format: date-time
+      sent_at:
+        type: string
+        format: date-time
+      created_at:
+        type: string
+        format: date-time
+
+  ValidatedInvitation:
+    type: object
+    description: Result of token validation
+    properties:
+      valid:
+        type: boolean
+      invitation:
+        $ref: "#/definitions/Invitation"
+      error:
+        type: string
+        description: Error message if invalid
+
+  CreateInvitationRequest:
+    type: object
+    required:
+      - email
+      - invitation_type
+    properties:
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+        maxLength: 255
+      invitation_type:
+        $ref: "#/definitions/InvitationType"
+      target_id:
+        type: string
+        format: uuid
+      target_role:
+        type: string
+        maxLength: 50
+      message:
+        type: string
+        maxLength: 1000
+      expires_in_days:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 7
+      send_email:
+        type: boolean
+        default: true
+        description: Whether to send invitation email immediately
+      metadata:
+        type: object
+
+  BulkInvitationRequest:
+    type: object
+    required:
+      - invitations
+    properties:
+      invitations:
+        type: array
+        items:
+          $ref: "#/definitions/CreateInvitationRequest"
+        minItems: 1
+        maxItems: 100
+      send_emails:
+        type: boolean
+        default: true
+
+  BulkInvitationResult:
+    type: object
+    properties:
+      successful:
+        type: array
+        items:
+          $ref: "#/definitions/InvitationSummary"
+      failed:
+        type: array
+        items:
+          type: object
+          properties:
+            email:
+              type: string
+            reason:
+              type: string
+      total:
+        type: integer
+      success_count:
+        type: integer
+      failure_count:
+        type: integer
+
+  AcceptInvitationRequest:
+    type: object
+    properties:
+      name:
+        type: string
+        maxLength: 255
+        description: Update recipient name on acceptance
+      password:
+        type: string
+        minLength: 8
+        description: Set password for new user (if creating account)
+      metadata:
+        type: object
+        description: Additional data for onboarding
+
+  AcceptInvitationResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+      user_id:
+        type: string
+        format: uuid
+        description: Created or existing user ID
+      redirect_url:
+        type: string
+        format: uri
+        description: Where to redirect after acceptance
+      message:
+        type: string
+
+  ListInvitationsParams:
+    type: object
+    properties:
+      page:
+        type: integer
+        default: 1
+      page_size:
+        type: integer
+        default: 20
+      status:
+        $ref: "#/definitions/InvitationStatus"
+      invitation_type:
+        $ref: "#/definitions/InvitationType"
+      target_id:
+        type: string
+        format: uuid
+      email:
+        type: string
+      search:
+        type: string
+      sort:
+        type: string
+        default: "created_at:desc"
+
+  InvitationListResponse:
+    type: object
+    properties:
+      data:
+        type: array
+        items:
+          $ref: "#/definitions/InvitationSummary"
+      pagination:
+        $ref: "common.yaml#/definitions/Pagination"
+
+  InvitationConfig:
+    type: object
+    description: Configuration for invitation system
+    properties:
+      default_ttl_days:
+        type: integer
+        default: 7
+        description: Default expiry in days
+      max_ttl_days:
+        type: integer
+        default: 30
+        description: Maximum allowed expiry
+      allow_resend:
+        type: boolean
+        default: true
+      resend_cooldown_minutes:
+        type: integer
+        default: 5
+        description: Minimum time between resends
+      max_active_per_email:
+        type: integer
+        default: 3
+        description: Maximum active invitations per email
+
+indexes:
+  - name: idx_invitation_token
+    columns: [token]
+    unique: true
+  - name: idx_invitation_tenant_email
+    columns: [tenant_id, email]
+  - name: idx_invitation_status
+    columns: [tenant_id, status]
+  - name: idx_invitation_target
+    columns: [invitation_type, target_id]
+  - name: idx_invitation_expires
+    columns: [expires_at]
+    where: "status IN ('pending', 'sent', 'viewed')"

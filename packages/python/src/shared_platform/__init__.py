@@ -8,6 +8,7 @@ Usage:
     from shared_platform import AuthClient, UserClient, NotificationClient
     from shared_platform import AuditClient, FeatureFlagClient
     from shared_platform import TenantClient, DepartmentClient
+    from shared_platform import RoleClient, TeamClient, InvitationClient
     from shared_platform.models import User, UserContext
     from shared_platform.events import EmailNotificationEvent
 """
@@ -18,6 +19,9 @@ from shared_platform.notifications import NotificationClient
 from shared_platform.audit import AuditClient
 from shared_platform.features import FeatureFlagClient
 from shared_platform.tenants import TenantClient, DepartmentClient
+from shared_platform.permissions import RoleClient
+from shared_platform.teams import TeamClient
+from shared_platform.invitations import InvitationClient
 
 __version__ = "0.1.0"
 __all__ = [
@@ -28,5 +32,8 @@ __all__ = [
     "FeatureFlagClient",
     "TenantClient",
     "DepartmentClient",
+    "RoleClient",
+    "TeamClient",
+    "InvitationClient",
     "__version__",
 ]

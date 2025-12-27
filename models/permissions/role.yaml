@@ -1,0 +1,212 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/schemas/permissions/role.yaml"
+title: Role
+description: |
+  Role model for RBAC (Role-Based Access Control).
+  Roles contain a set of permissions and can be assigned to users.
+  Supports multi-tenancy with optional tenant_id for tenant-specific roles.
+
+definitions:
+  Role:
+    type: object
+    required:
+      - name
+      - slug
+      - permissions
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique role identifier
+      tenant_id:
+        type: string
+        format: uuid
+        description: Tenant ID for tenant-specific roles. Null for system roles.
+      name:
+        type: string
+        maxLength: 100
+        description: Human-readable role name
+      slug:
+        type: string
+        maxLength: 50
+        pattern: "^[a-z0-9_-]+$"
+        description: URL-safe unique identifier (per tenant)
+      description:
+        type: string
+        maxLength: 500
+        description: Role description
+      permissions:
+        type: array
+        items:
+          type: string
+          pattern: "^[a-z_*]+:[a-z_*]+$"
+        description: |
+          List of permissions in "resource:action" format.
+          Examples: "users:read", "users:write", "courses:*", "*:*"
+          Wildcards: "*" matches any resource or action
+      hierarchy_level:
+        type: integer
+        minimum: 0
+        maximum: 100
+        default: 50
+        description: |
+          Role hierarchy level. Lower = more privileges.
+          0 = super_admin, 10 = admin, 20 = manager, 30 = member, 40 = guest
+      is_system:
+        type: boolean
+        default: false
+        description: System roles cannot be deleted or modified
+      is_active:
+        type: boolean
+        default: true
+        description: Whether the role is active
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+        format: uuid
+      updated_by:
+        type: string
+        format: uuid
+
+  RoleSummary:
+    type: object
+    required:
+      - id
+      - name
+      - slug
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+      slug:
+        type: string
+      hierarchy_level:
+        type: integer
+      is_system:
+        type: boolean
+      is_active:
+        type: boolean
+      permission_count:
+        type: integer
+        description: Number of permissions in this role
+
+  RoleAssignment:
+    type: object
+    description: Assignment of a role to a user
+    required:
+      - user_id
+      - role_id
+    properties:
+      id:
+        type: string
+        format: uuid
+      user_id:
+        type: string
+        format: uuid
+      role_id:
+        type: string
+        format: uuid
+      granted_at:
+        type: string
+        format: date-time
+      granted_by:
+        type: string
+        format: uuid
+        description: User who granted this role
+      expires_at:
+        type: string
+        format: date-time
+        description: Optional expiration time for temporary role assignments
+
+  CreateRoleRequest:
+    type: object
+    required:
+      - name
+      - slug
+      - permissions
+    properties:
+      name:
+        type: string
+        maxLength: 100
+      slug:
+        type: string
+        maxLength: 50
+        pattern: "^[a-z0-9_-]+$"
+      description:
+        type: string
+        maxLength: 500
+      permissions:
+        type: array
+        items:
+          type: string
+      hierarchy_level:
+        type: integer
+        minimum: 0
+        maximum: 100
+
+  UpdateRoleRequest:
+    type: object
+    properties:
+      name:
+        type: string
+        maxLength: 100
+      description:
+        type: string
+        maxLength: 500
+      permissions:
+        type: array
+        items:
+          type: string
+      hierarchy_level:
+        type: integer
+        minimum: 0
+        maximum: 100
+      is_active:
+        type: boolean
+
+  ListRolesParams:
+    type: object
+    properties:
+      page:
+        type: integer
+        default: 1
+      page_size:
+        type: integer
+        default: 20
+      is_active:
+        type: boolean
+      is_system:
+        type: boolean
+      search:
+        type: string
+      sort:
+        type: string
+        default: "hierarchy_level:asc"
+
+  RoleListResponse:
+    type: object
+    properties:
+      data:
+        type: array
+        items:
+          $ref: "#/definitions/RoleSummary"
+      pagination:
+        $ref: "common.yaml#/definitions/Pagination"
+
+indexes:
+  - name: idx_role_tenant_slug
+    columns: [tenant_id, slug]
+    unique: true
+  - name: idx_role_hierarchy
+    columns: [tenant_id, hierarchy_level]
+  - name: idx_role_assignment_user
+    columns: [user_id]
+  - name: idx_role_assignment_role
+    columns: [role_id]

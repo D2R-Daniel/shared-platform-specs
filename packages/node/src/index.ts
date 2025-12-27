@@ -8,6 +8,7 @@
  * ```typescript
  * import { AuthClient, UserClient, NotificationClient } from '@platform/shared-sdk';
  * import { AuditClient, FeatureFlagClient } from '@platform/shared-sdk';
+ * import { RoleClient, TeamClient, InvitationClient } from '@platform/shared-sdk';
  *
  * const auth = new AuthClient({ issuerUrl: 'https://auth.example.com' });
  * const users = new UserClient({ baseUrl: 'https://api.example.com' });
@@ -20,6 +21,9 @@ export { NotificationClient } from './notifications';
 export { AuditClient } from './audit';
 export { FeatureFlagClient } from './features';
 export { TenantClient, DepartmentClient } from './tenants';
+export { RoleClient, matchesPermission, hasAnyPermission, hasAllPermissions } from './permissions';
+export { TeamClient } from './teams';
+export { InvitationClient } from './invitations';
 
 export type {
   // Auth types
@@ -91,5 +95,48 @@ export type {
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
 } from './tenants';
+
+export type {
+  // Role and permission types
+  Role as RoleModel,
+  RoleSummary,
+  RoleAssignment,
+  UserRole,
+  PermissionCheckResult,
+  CreateRoleRequest,
+  UpdateRoleRequest,
+  AssignRoleRequest,
+  RoleListResponse,
+} from './permissions';
+
+export type {
+  // Team types
+  Team,
+  TeamSummary,
+  TeamTree,
+  TeamWithDetails,
+  TeamMember,
+  TeamMemberRole,
+  CreateTeamRequest,
+  UpdateTeamRequest,
+  AddTeamMemberRequest,
+  TeamListResponse,
+  TeamMembersResponse,
+} from './teams';
+
+export type {
+  // Invitation types
+  Invitation,
+  InvitationSummary,
+  InvitationStatus,
+  InvitationType,
+  ValidatedInvitation,
+  CreateInvitationRequest,
+  BulkInvitationRequest,
+  BulkInvitationResult,
+  AcceptInvitationRequest,
+  AcceptInvitationResponse,
+  InvitationListResponse,
+} from './invitations';
 
 export const VERSION = '0.1.0';

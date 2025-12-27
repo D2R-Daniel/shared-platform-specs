@@ -1,0 +1,179 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/schemas/permissions/permission.yaml"
+title: Permission
+description: |
+  Permission definitions and utilities for RBAC.
+  Permissions follow the "resource:action" format.
+
+definitions:
+  Permission:
+    type: object
+    description: |
+      A permission string in "resource:action" format.
+      Examples: "users:read", "courses:write", "settings:*"
+    required:
+      - resource
+      - action
+    properties:
+      resource:
+        type: string
+        pattern: "^[a-z_*]+$"
+        description: |
+          Resource name (e.g., "users", "courses", "settings").
+          Use "*" for all resources.
+      action:
+        type: string
+        pattern: "^[a-z_*]+$"
+        description: |
+          Action name (e.g., "read", "write", "delete", "manage").
+          Use "*" for all actions.
+      description:
+        type: string
+        maxLength: 255
+        description: Human-readable description of this permission
+
+  PermissionCategory:
+    type: object
+    description: Grouping of related permissions
+    properties:
+      name:
+        type: string
+        description: Category name (e.g., "User Management")
+      slug:
+        type: string
+        pattern: "^[a-z_]+$"
+        description: Category identifier
+      permissions:
+        type: array
+        items:
+          $ref: "#/definitions/Permission"
+
+  PermissionCheckRequest:
+    type: object
+    description: Request to check if a user has a specific permission
+    required:
+      - user_id
+      - permission
+    properties:
+      user_id:
+        type: string
+        format: uuid
+      permission:
+        type: string
+        pattern: "^[a-z_*]+:[a-z_*]+$"
+        description: Permission to check (e.g., "users:read")
+      context:
+        type: object
+        additionalProperties: true
+        description: Additional context for attribute-based checks
+
+  PermissionCheckResponse:
+    type: object
+    properties:
+      allowed:
+        type: boolean
+        description: Whether the user has the permission
+      matched_permission:
+        type: string
+        description: The permission that matched (may be wildcard)
+      matched_role:
+        type: string
+        description: The role that granted this permission
+
+  # Standard permissions for common resources
+  StandardPermissions:
+    description: |
+      Standard permission patterns used across the platform:
+
+      User Management:
+        - users:read - View user profiles
+        - users:write - Create/update users
+        - users:delete - Delete users
+        - users:manage - Full user management
+
+      Role Management:
+        - roles:read - View roles
+        - roles:write - Create/update roles
+        - roles:assign - Assign roles to users
+        - roles:manage - Full role management
+
+      Team Management:
+        - teams:read - View teams
+        - teams:write - Create/update teams
+        - teams:members - Manage team members
+        - teams:manage - Full team management
+
+      Settings:
+        - settings:read - View settings
+        - settings:write - Modify settings
+
+      Admin:
+        - admin:* - Full admin access
+        - *:* - Super admin (all permissions)
+    type: string
+    enum:
+      - "users:read"
+      - "users:write"
+      - "users:delete"
+      - "users:manage"
+      - "roles:read"
+      - "roles:write"
+      - "roles:assign"
+      - "roles:manage"
+      - "teams:read"
+      - "teams:write"
+      - "teams:members"
+      - "teams:manage"
+      - "settings:read"
+      - "settings:write"
+      - "admin:*"
+      - "*:*"
+
+  # Default role definitions
+  DefaultRoles:
+    description: |
+      Standard role hierarchy:
+
+      Level 0 - super_admin:
+        - Permissions: ["*:*"]
+        - Full system access
+
+      Level 10 - admin:
+        - Permissions: ["admin:*", "users:manage", "roles:manage", "teams:manage"]
+        - Organization-wide admin access
+
+      Level 20 - manager:
+        - Permissions: ["users:read", "teams:manage", "settings:read"]
+        - Team management access
+
+      Level 30 - member:
+        - Permissions: ["users:read:self", "teams:read", "settings:read"]
+        - Standard user access
+
+      Level 40 - guest:
+        - Permissions: ["users:read:self"]
+        - Minimal read-only access
+    type: object
+    properties:
+      super_admin:
+        type: object
+        properties:
+          hierarchy_level: { const: 0 }
+          permissions: { const: ["*:*"] }
+      admin:
+        type: object
+        properties:
+          hierarchy_level: { const: 10 }
+          permissions: { const: ["admin:*"] }
+      manager:
+        type: object
+        properties:
+          hierarchy_level: { const: 20 }
+      member:
+        type: object
+        properties:
+          hierarchy_level: { const: 30 }
+      guest:
+        type: object
+        properties:
+          hierarchy_level: { const: 40 }

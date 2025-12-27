@@ -1,0 +1,357 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://platform.example.com/schemas/teams/team.yaml"
+title: Team
+description: |
+  Team and group management models.
+  Supports hierarchical teams with parent-child relationships.
+
+definitions:
+  TeamMemberRole:
+    type: string
+    enum:
+      - owner
+      - admin
+      - member
+    description: |
+      Role within a team:
+      - owner: Full control, can delete team
+      - admin: Can manage members and settings
+      - member: Standard team member
+
+  Team:
+    type: object
+    required:
+      - tenant_id
+      - name
+      - slug
+    properties:
+      id:
+        type: string
+        format: uuid
+        description: Unique team identifier
+      tenant_id:
+        type: string
+        format: uuid
+        description: Tenant this team belongs to
+      name:
+        type: string
+        maxLength: 255
+        description: Team display name
+      slug:
+        type: string
+        maxLength: 100
+        pattern: "^[a-z0-9_-]+$"
+        description: URL-safe unique identifier (per tenant)
+      description:
+        type: string
+        maxLength: 1000
+        description: Team description
+      parent_id:
+        type: string
+        format: uuid
+        description: Parent team ID for hierarchical teams
+      path:
+        type: string
+        description: Materialized path for hierarchy (e.g., "/root/parent/this")
+      level:
+        type: integer
+        minimum: 0
+        default: 0
+        description: Depth in hierarchy (0 = root)
+      owner_id:
+        type: string
+        format: uuid
+        description: User ID of team owner/lead
+      avatar_url:
+        type: string
+        format: uri
+        description: Team avatar/logo URL
+      is_active:
+        type: boolean
+        default: true
+      is_private:
+        type: boolean
+        default: false
+        description: Whether team is visible to non-members
+      settings:
+        type: object
+        additionalProperties: true
+        description: Team-specific settings
+      metadata:
+        type: object
+        additionalProperties: true
+        description: Custom metadata
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+        format: uuid
+      updated_by:
+        type: string
+        format: uuid
+
+  TeamSummary:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+      slug:
+        type: string
+      description:
+        type: string
+      level:
+        type: integer
+      is_active:
+        type: boolean
+      is_private:
+        type: boolean
+      member_count:
+        type: integer
+      owner:
+        $ref: "#/definitions/UserSummary"
+
+  TeamTree:
+    type: object
+    description: Team with nested children for tree representation
+    allOf:
+      - $ref: "#/definitions/Team"
+      - type: object
+        properties:
+          children:
+            type: array
+            items:
+              $ref: "#/definitions/TeamTree"
+          member_count:
+            type: integer
+          total_member_count:
+            type: integer
+            description: Including all descendant teams
+
+  TeamMember:
+    type: object
+    required:
+      - team_id
+      - user_id
+      - role
+    properties:
+      id:
+        type: string
+        format: uuid
+      team_id:
+        type: string
+        format: uuid
+      user_id:
+        type: string
+        format: uuid
+      role:
+        $ref: "#/definitions/TeamMemberRole"
+      joined_at:
+        type: string
+        format: date-time
+      invited_by:
+        type: string
+        format: uuid
+        description: User who added this member
+      user:
+        $ref: "#/definitions/UserSummary"
+        description: User details (when included)
+
+  TeamMemberWithUser:
+    type: object
+    allOf:
+      - $ref: "#/definitions/TeamMember"
+      - type: object
+        required:
+          - user
+        properties:
+          user:
+            $ref: "#/definitions/UserSummary"
+
+  UserSummary:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+      picture:
+        type: string
+        format: uri
+
+  CreateTeamRequest:
+    type: object
+    required:
+      - name
+      - slug
+    properties:
+      name:
+        type: string
+        maxLength: 255
+      slug:
+        type: string
+        maxLength: 100
+        pattern: "^[a-z0-9_-]+$"
+      description:
+        type: string
+        maxLength: 1000
+      parent_id:
+        type: string
+        format: uuid
+      owner_id:
+        type: string
+        format: uuid
+      avatar_url:
+        type: string
+        format: uri
+      is_private:
+        type: boolean
+        default: false
+      settings:
+        type: object
+      metadata:
+        type: object
+
+  UpdateTeamRequest:
+    type: object
+    properties:
+      name:
+        type: string
+        maxLength: 255
+      description:
+        type: string
+        maxLength: 1000
+      owner_id:
+        type: string
+        format: uuid
+      avatar_url:
+        type: string
+        format: uri
+      is_active:
+        type: boolean
+      is_private:
+        type: boolean
+      settings:
+        type: object
+      metadata:
+        type: object
+
+  AddTeamMemberRequest:
+    type: object
+    required:
+      - user_id
+    properties:
+      user_id:
+        type: string
+        format: uuid
+      role:
+        $ref: "#/definitions/TeamMemberRole"
+        default: member
+
+  UpdateTeamMemberRequest:
+    type: object
+    properties:
+      role:
+        $ref: "#/definitions/TeamMemberRole"
+
+  ListTeamsParams:
+    type: object
+    properties:
+      page:
+        type: integer
+        default: 1
+      page_size:
+        type: integer
+        default: 20
+      parent_id:
+        type: string
+        format: uuid
+      owner_id:
+        type: string
+        format: uuid
+      is_active:
+        type: boolean
+      is_private:
+        type: boolean
+      search:
+        type: string
+      include_children:
+        type: boolean
+        default: false
+      sort:
+        type: string
+        default: "name:asc"
+
+  GetTeamTreeParams:
+    type: object
+    properties:
+      root_id:
+        type: string
+        format: uuid
+        description: Start from specific team (null = all root teams)
+      max_depth:
+        type: integer
+        default: 10
+      include_members:
+        type: boolean
+        default: false
+
+  ListTeamMembersParams:
+    type: object
+    properties:
+      page:
+        type: integer
+        default: 1
+      page_size:
+        type: integer
+        default: 20
+      role:
+        $ref: "#/definitions/TeamMemberRole"
+      search:
+        type: string
+
+  TeamListResponse:
+    type: object
+    properties:
+      data:
+        type: array
+        items:
+          $ref: "#/definitions/TeamSummary"
+      pagination:
+        $ref: "common.yaml#/definitions/Pagination"
+
+  TeamMembersResponse:
+    type: object
+    properties:
+      data:
+        type: array
+        items:
+          $ref: "#/definitions/TeamMemberWithUser"
+      pagination:
+        $ref: "common.yaml#/definitions/Pagination"
+
+indexes:
+  - name: idx_team_tenant_slug
+    columns: [tenant_id, slug]
+    unique: true
+  - name: idx_team_parent
+    columns: [parent_id]
+  - name: idx_team_owner
+    columns: [owner_id]
+  - name: idx_team_member_team
+    columns: [team_id]
+  - name: idx_team_member_user
+    columns: [user_id]
+  - name: idx_team_member_unique
+    columns: [team_id, user_id]
+    unique: true

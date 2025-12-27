@@ -1,0 +1,430 @@
+openapi: 3.0.3
+info:
+  title: Permissions API
+  description: |
+    Role-Based Access Control (RBAC) API for managing roles and permissions.
+    Supports role hierarchy, wildcard permissions, and user role assignments.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+paths:
+  /roles:
+    get:
+      summary: List roles
+      operationId: listRoles
+      tags: [Roles]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - name: is_system
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "hierarchy_level:asc"
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListResponse'
+
+    post:
+      summary: Create role
+      operationId: createRole
+      tags: [Roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '409':
+          description: Role slug already exists
+
+  /roles/{roleId}:
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get role
+      operationId: getRole
+      tags: [Roles]
+      responses:
+        '200':
+          description: Role details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          description: Role not found
+
+    put:
+      summary: Update role
+      operationId: updateRole
+      tags: [Roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          description: Role not found
+
+    delete:
+      summary: Delete role
+      operationId: deleteRole
+      tags: [Roles]
+      responses:
+        '204':
+          description: Role deleted
+        '404':
+          description: Role not found
+        '409':
+          description: Cannot delete system role
+
+  /users/{userId}/roles:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get user's roles
+      operationId: getUserRoles
+      tags: [User Roles]
+      responses:
+        '200':
+          description: User's assigned roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoleAssignment'
+
+    post:
+      summary: Assign role to user
+      operationId: assignRole
+      tags: [User Roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role_id
+              properties:
+                role_id:
+                  type: string
+                  format: uuid
+                expires_at:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Role assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleAssignment'
+        '409':
+          description: Role already assigned
+
+  /users/{userId}/roles/{roleId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    delete:
+      summary: Remove role from user
+      operationId: removeRole
+      tags: [User Roles]
+      responses:
+        '204':
+          description: Role removed
+        '404':
+          description: Assignment not found
+
+  /permissions/check:
+    post:
+      summary: Check permission
+      operationId: checkPermission
+      tags: [Permissions]
+      description: Check if a user has a specific permission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionCheckRequest'
+      responses:
+        '200':
+          description: Permission check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionCheckResponse'
+
+  /users/{userId}/permissions:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get user's effective permissions
+      operationId: getUserPermissions
+      tags: [Permissions]
+      description: Get all permissions for a user (aggregated from all roles)
+      responses:
+        '200':
+          description: User's permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  roles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoleSummary'
+
+components:
+  schemas:
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        hierarchy_level:
+          type: integer
+        is_system:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RoleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        hierarchy_level:
+          type: integer
+        is_system:
+          type: boolean
+        is_active:
+          type: boolean
+        permission_count:
+          type: integer
+
+    RoleAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/RoleSummary'
+        granted_at:
+          type: string
+          format: date-time
+        granted_by:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+
+    CreateRoleRequest:
+      type: object
+      required:
+        - name
+        - slug
+        - permissions
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        slug:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 500
+        permissions:
+          type: array
+          items:
+            type: string
+        hierarchy_level:
+          type: integer
+          default: 50
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        permissions:
+          type: array
+          items:
+            type: string
+        hierarchy_level:
+          type: integer
+        is_active:
+          type: boolean
+
+    PermissionCheckRequest:
+      type: object
+      required:
+        - user_id
+        - permission
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        permission:
+          type: string
+          description: Permission in "resource:action" format
+        context:
+          type: object
+          additionalProperties: true
+
+    PermissionCheckResponse:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        matched_permission:
+          type: string
+        matched_role:
+          type: string
+
+    RoleListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean

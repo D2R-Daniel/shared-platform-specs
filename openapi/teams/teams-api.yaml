@@ -1,0 +1,573 @@
+openapi: 3.0.3
+info:
+  title: Teams API
+  description: |
+    Team and group management API.
+    Supports hierarchical teams with parent-child relationships.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+paths:
+  /teams:
+    get:
+      summary: List teams
+      operationId: listTeams
+      tags: [Teams]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - name: is_private
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "name:asc"
+      responses:
+        '200':
+          description: List of teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamListResponse'
+
+    post:
+      summary: Create team
+      operationId: createTeam
+      tags: [Teams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeamRequest'
+      responses:
+        '201':
+          description: Team created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '409':
+          description: Team slug already exists
+
+  /teams/tree:
+    get:
+      summary: Get team hierarchy tree
+      operationId: getTeamTree
+      tags: [Teams]
+      parameters:
+        - name: root_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Start from specific team (null = all root teams)
+        - name: max_depth
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: include_members
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Team hierarchy tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeamTree'
+
+  /teams/{teamId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get team
+      operationId: getTeam
+      tags: [Teams]
+      parameters:
+        - name: include_owner
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: include_parent
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Team details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamWithDetails'
+        '404':
+          description: Team not found
+
+    put:
+      summary: Update team
+      operationId: updateTeam
+      tags: [Teams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamRequest'
+      responses:
+        '200':
+          description: Team updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          description: Team not found
+
+    delete:
+      summary: Delete team
+      operationId: deleteTeam
+      tags: [Teams]
+      parameters:
+        - name: force
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Force delete even if team has members
+      responses:
+        '204':
+          description: Team deleted
+        '404':
+          description: Team not found
+        '409':
+          description: Team has members or child teams
+
+  /teams/{teamId}/members:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: List team members
+      operationId: listTeamMembers
+      tags: [Team Members]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, admin, member]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Team members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMembersResponse'
+
+    post:
+      summary: Add team member
+      operationId: addTeamMember
+      tags: [Team Members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberRequest'
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '409':
+          description: User is already a member
+
+  /teams/{teamId}/members/{userId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    put:
+      summary: Update member role
+      operationId: updateTeamMember
+      tags: [Team Members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamMemberRequest'
+      responses:
+        '200':
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '404':
+          description: Member not found
+
+    delete:
+      summary: Remove team member
+      operationId: removeTeamMember
+      tags: [Team Members]
+      responses:
+        '204':
+          description: Member removed
+        '404':
+          description: Member not found
+
+  /teams/{teamId}/move:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      summary: Move team to new parent
+      operationId: moveTeam
+      tags: [Teams]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                new_parent_id:
+                  type: string
+                  format: uuid
+                  description: New parent team ID (null for root)
+      responses:
+        '200':
+          description: Team moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '409':
+          description: Would create circular reference
+
+components:
+  schemas:
+    Team:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        parent_id:
+          type: string
+          format: uuid
+        path:
+          type: string
+        level:
+          type: integer
+        owner_id:
+          type: string
+          format: uuid
+        avatar_url:
+          type: string
+        is_active:
+          type: boolean
+        is_private:
+          type: boolean
+        settings:
+          type: object
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TeamSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        level:
+          type: integer
+        is_active:
+          type: boolean
+        is_private:
+          type: boolean
+        member_count:
+          type: integer
+
+    TeamWithDetails:
+      allOf:
+        - $ref: '#/components/schemas/Team'
+        - type: object
+          properties:
+            owner:
+              $ref: '#/components/schemas/UserSummary'
+            parent:
+              $ref: '#/components/schemas/TeamSummary'
+            children_count:
+              type: integer
+            member_count:
+              type: integer
+
+    TeamTree:
+      allOf:
+        - $ref: '#/components/schemas/Team'
+        - type: object
+          properties:
+            children:
+              type: array
+              items:
+                $ref: '#/components/schemas/TeamTree'
+            member_count:
+              type: integer
+            total_member_count:
+              type: integer
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        team_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joined_at:
+          type: string
+          format: date-time
+        invited_by:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        picture:
+          type: string
+
+    CreateTeamRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        parent_id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        avatar_url:
+          type: string
+        is_private:
+          type: boolean
+          default: false
+        settings:
+          type: object
+        metadata:
+          type: object
+
+    UpdateTeamRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        owner_id:
+          type: string
+          format: uuid
+        avatar_url:
+          type: string
+        is_active:
+          type: boolean
+        is_private:
+          type: boolean
+        settings:
+          type: object
+        metadata:
+          type: object
+
+    AddTeamMemberRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member]
+          default: member
+
+    UpdateTeamMemberRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum: [owner, admin, member]
+
+    TeamListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    TeamMembersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
