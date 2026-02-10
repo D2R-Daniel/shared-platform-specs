@@ -4,7 +4,7 @@
   "workspaces": ["packages/dream/*"],
   "scripts": {
     "dream:test": "cd packages/dream/types && npx vitest run && cd ../errors && npx vitest run && cd ../rbac && npx vitest run && cd ../auth && npx vitest run && cd ../multi-tenant && npx vitest run",
-    "dream:build": "cd packages/dream/types && npx tsc && cd ../errors && npx tsc && cd ../rbac && npx tsc && cd ../auth && npx tsc && cd ../multi-tenant && npx tsc",
-    "dream:typecheck": "cd packages/dream/types && npx tsc --noEmit && cd ../errors && npx tsc --noEmit && cd ../rbac && npx tsc --noEmit && cd ../auth && npx tsc --noEmit && cd ../multi-tenant && npx tsc --noEmit"
+    "dream:build": "cd packages/dream/types && npx tsc && cd ../errors && npx tsc && cd ../rbac && npx tsc && cd ../auth && npx tsc && cd ../multi-tenant && npx tsc && cd ../ui && npm run build && cd ../app && npx tsc",
+    "dream:typecheck": "cd packages/dream/types && npx tsc --noEmit && cd ../errors && npx tsc --noEmit && cd ../rbac && npx tsc --noEmit && cd ../auth && npx tsc --noEmit && cd ../multi-tenant && npx tsc --noEmit && cd ../ui && npx tsc --noEmit && cd ../app && npx tsc --noEmit"
   }
 }
