@@ -152,28 +152,31 @@ HTTP status codes map to exceptions consistently:
 | 429 | `RateLimitError` | `RateLimitError` | `RateLimitException` |
 | 5xx | `ServerError` | `ServerError` | `ServerException` |
 
-## Speckit Lifecycle (MANDATORY)
+## Development Workflow
 
-**All non-trivial features MUST follow the speckit lifecycle.** This is enforced by the project constitution (`.specify/memory/constitution.md` v2.0.0). Skipping phases is a constitution violation.
-
-### Lifecycle Phases
-
+### For New Features (complex, multi-file)
 ```
-specify → clarify → research → plan → tasks → implement → verify
+/feature-dev [description]
+```
+7-phase guided workflow: Discovery → Codebase Exploration → Clarifying Questions → Architecture Design → Implementation → Quality Review → Summary
+
+### For Iterative Tasks (TDD, refactoring)
+```
+/ralph-loop "task description"
 ```
 
-| Phase | Command | Produces | Required? |
-|-------|---------|----------|-----------|
-| 0. Init | `./.specify/scripts/bash/create-new-feature.sh` | Branch + `specs/{###}-{name}/` dir | Yes |
-| 1. Specify | `/speckit.specify` | `specs/{###}/spec.md` | **Yes — IRON LAW** |
-| 2. Clarify | `/speckit.clarify` | Refined spec.md (ambiguities resolved) | Recommended |
-| 3. Research | `/speckit.research` | `specs/{###}/research.md` | For novel features |
-| 4. Plan | `/speckit.plan` | `plan.md`, `data-model.md`, `contracts/`, etc. | **Yes — IRON LAW** |
-| 5. Tasks | `/speckit.tasks` | `specs/{###}/tasks.md` | **Yes** |
-| 6. Implement | `/speckit.implement` | Working code with tests | **Yes — TDD** |
-| 7. Verify | Fresh test/type/build runs | Evidence of all gates passing | **Yes — IRON LAW** |
+### For Code Review
+```
+/code-review
+```
 
-### Constitution Iron Laws
+### For Git
+```
+/commit                  # Analyze + commit
+/commit-push-pr          # Commit + push + create PR
+```
+
+## Development Principles
 
 These are **non-negotiable**. All code reviews verify compliance.
 
@@ -182,7 +185,7 @@ These are **non-negotiable**. All code reviews verify compliance.
 3. **Evidence-Based Verification** — NO completion claims without fresh verification evidence. Run commands fresh, read complete output, report actual numbers ("47 tests passed, 0 failed").
 4. **Systematic Debugging** — NO fixes without root cause investigation first. One small change per hypothesis. Create failing test before implementing fix.
 5. **Discovery-First Design** — MUST explore requirements & alternatives before implementation. Propose 2-3 approaches with trade-offs.
-6. **Plan-Driven Development** — Multi-step tasks MUST have a written `plan.md` before coding. Plans contain bite-sized tasks (2-5 min each) with exact file paths, code, commands, and expected output.
+6. **Plan-Driven Development** — Multi-step tasks MUST have a written `plan.md` before coding. Plans contain bite-sized tasks with exact file paths, code, commands, and expected output.
 7. **Security-First Design** — No secrets in code/logs. HTTPS enforced. All inputs validated. Secure crypto only.
 8. **Simplicity & Maintainability** — Single responsibility. No premature abstraction. YAGNI. Delete unused code completely.
 9. **Semantic Versioning** — MAJOR.MINOR.PATCH. Breaking changes require migration guide. Deprecation warnings precede removal.
@@ -214,14 +217,14 @@ specs/
 | Spec Compliance | Implementation matches spec acceptance criteria |
 | Documentation | Public APIs documented |
 
-### When to Skip the Lifecycle
+### When to Skip the Workflow
 
 - **Trivial changes** (typo fix, single-line bug fix, doc update): Skip spec phase, commit directly.
-- **Everything else**: Full lifecycle. If it touches multiple files, adds an API, or requires design decisions — you need a spec.
+- **Everything else**: Use `/feature-dev`. If it touches multiple files, adds an API, or requires design decisions — you need a spec.
 
 ## Adding New Modules
 
-Follow the speckit lifecycle above. The implementation phase for SDK modules specifically requires:
+Follow the development workflow above. The implementation phase for SDK modules specifically requires:
 
 1. Create YAML model in `models/{module}/`
 2. Create OpenAPI spec in `openapi/{module}/`
@@ -246,13 +249,6 @@ Review skills in `.claude/skills/`:
 - **security-reviewer**: Security best practices
 - **code-architecture**: Architecture review
 - **excel-generator**: Report generation
-
-## Workflows
-
-- **Speckit Lifecycle**: See "Speckit Lifecycle (MANDATORY)" section above — this is the primary development workflow
-- **Constitution**: `.specify/memory/constitution.md` — the 9 Iron Laws governing all development
-- **Templates**: `.specify/templates/` — spec, plan, tasks, checklist, and research templates
-- **Scripts**: `.specify/scripts/bash/` — feature init, plan setup, prerequisites check
 
 ## Testing Requirements
 
